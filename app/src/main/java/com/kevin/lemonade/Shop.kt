@@ -92,11 +92,13 @@ fun ShopScreen(g: GameViewModel) {
                 }
                 if (isOpen) {
                     Column(Modifier.padding(start = 10.dp, end = 10.dp, bottom = 10.dp)) {
+                        // Mr. Zest loves the mustache: 30% off wearing the full set, 10% off wearing just the piece.
+                        val discount = g.closet.mustacheDiscount()
                         for (u in items) UpgradeCard(
                             name = g.named(u.name),
                             desc = g.upgradeDesc(u),
-                            level = g.lv(u.id), max = u.max, cost = u.cost(g.lv(u.id)),
-                            canBuy = g.money >= u.cost(g.lv(u.id)),
+                            level = g.lv(u.id), max = u.max, cost = u.cost(g.lv(u.id), discount),
+                            canBuy = g.money >= u.cost(g.lv(u.id), discount),
                             levelText = null,
                         ) { g.buy(u) }
                     }
