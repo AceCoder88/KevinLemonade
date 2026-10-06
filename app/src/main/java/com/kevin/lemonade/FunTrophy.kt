@@ -27,10 +27,8 @@ val TROPHIES = listOf(
     TrophyDef("Nightmare escapee", "Escape the Nightmare Realm") { _, _ -> false },
     // INTEGRATION: needs WarState.maxWave (the highest wave reached).
     TrophyDef("War hero", "Reach wave 10 in war") { _, _ -> false },
-    // INTEGRATION: needs PirateState.voyage (the current voyage number).
-    TrophyDef("Pirate captain", "Reach voyage 3 as a pirate") { _, _ -> false },
-    // INTEGRATION: needs DigState.dugDiamond (set true the first time a diamond ore is dug up).
-    TrophyDef("Diamond digger", "Dig up a diamond") { _, _ -> false },
+    TrophyDef("Pirate captain", "Reach voyage 3 as a pirate") { g, _ -> g.pirate.voyage >= 3 },
+    TrophyDef("Diamond digger", "Dig up a diamond") { g, _ -> g.dig.dugDiamond },
     TrophyDef("Lucky ticket", "Win the lottery JACKPOT") { _, f -> f.wonJackpot },
     TrophyDef("Tool collector", "Buy every tool") { g, _ -> listOf("bow", "pager", "telescope", "map", "closetkey", "shovel").all { g.lv(it) > 0 } },
     TrophyDef("True love", "Get {N} a girlfriend") { _, f -> f.lemyEver },
@@ -38,8 +36,7 @@ val TROPHIES = listOf(
 
 val SECRETS = listOf(
     TrophyDef("I know you're cheating", "You used the secret hall code. Busted!") { _, f -> f.usedHall },
-    // INTEGRATION: needs SpaceState.darthDefeated (set true after beating Darth Lime at the Lime Star).
-    TrophyDef("The chosen lemon", "Defeat Darth Lime at the Lime Star") { _, _ -> false },
+    TrophyDef("The chosen lemon", "Defeat Darth Lime at the Lime Star") { g, _ -> g.space.darthDefeated },
     // INTEGRATION: needs a day/night cycle plus a `wokeKevin` flag; nothing like it exists yet.
     TrophyDef("Sleepy head", "Wake {N} up when he falls asleep at night") { _, _ -> false },
     // INTEGRATION: needs a `rescuedPartner` flag from the Underworld-rescue flow (War's Furious Kevin fight / Death Realm).
