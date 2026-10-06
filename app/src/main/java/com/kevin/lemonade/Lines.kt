@@ -138,4 +138,76 @@ object Lines {
         "Sold! No refunds. Especially not to Kevin.", "Ka-ching! I love that sound.", "You've got great taste. Lemony taste.")
     val zestPoke = listOf("Hey, hands off the mustache! It took me YEARS.", "I've been selling upgrades since before Kevin was a seed.",
         "Psst... the traveling deals are the best ones. Don't tell anybody.", "My bell is for ringing, not for poking me!")
+
+    // ---------------- Death Realm / Nightmare Realm ----------------
+    /** who lives in the Death Realm: the first 4 are there from the start, then one more shows up every few pitchers */
+    data class FamMember(val who: String, val plea: String, val react: String)
+    val famList = listOf(
+        FamMember("Gary", "Gary: Hey Kevin! Wait, why is that hand coming at m—", "GARY?! I JUST got to see you again!"),
+        FamMember("Grandpa", "Grandpa: Back in my day, nobody got squeezed TWI—", "Grandpa got squeezed TWICE! That's a world record!"),
+        FamMember("Mom", "Mom: Kevin, did you clean your room? What's that squeez—", "MOM?! You squeezed my MOM?!"),
+        FamMember("Grandma", "Grandma: Oh, is it cookie time, dear?", "GRANDMA?! She made me cookies!"),
+        FamMember("Uncle Larry", "Uncle Larry: Wanna hear a lemon joke? It's so sour—", "He never got to finish his joke!"),
+        FamMember("Steve", "Steve: Hi! I'm just the neighbor! I'm not even fam—", "STEVE WASN'T EVEN FAMILY!"),
+        FamMember("Auntie", "Auntie: Kevin, stand up straight! WHY is that squeez—", "Auntie's ghost juice is gonna be SO sour."),
+        FamMember("Patricia", "Patricia: Don't touch my peel! I JUST got it d—", "Not again, Patricia! Her peel was SO shiny!"),
+        FamMember("Doug", "Doug: Hey. It's me. Doug.", "Classic Doug. Squeezed twice. Didn't even fight it."),
+        FamMember("Coach", "Coach: HUSTLE! HUSTLE! Wait, not into the squeez—", "Coach got benched. AGAIN."),
+    )
+    /** where each ghost floats on the 800x500 stage */
+    val famSlots = listOf(
+        530f to 120f, 655f to 195f, 745f to 320f, 436f to 74f, 620f to 52f,
+        760f to 190f, 290f to 175f, 740f to 420f, 560f to 215f, 480f to 150f,
+    )
+    val crowdPrefix = listOf("Cousin", "Uncle", "Auntie", "Grandpa", "Grandma", "Great-Uncle", "Great-Aunt", "Second Cousin", "Baby", "Big")
+    val crowdName = listOf("Bob", "Sue", "Lenny", "Zesty", "Peel", "Pip", "Rindy", "Citrus", "Sam", "Lou", "Mo", "Tangy", "Jo", "Squeezy", "Pulp", "Sunny", "Seedy", "Wedge")
+    /** Kevin's warning when you squeeze family you shouldn't */
+    val angry = listOf("That is NOT cool. That's GHOST JUICE!", "I brought you here to VISIT, not to SQUEEZE!",
+        "Stop squeezing my family!", "Is \$50 really worth it?! ...Don't answer that.", "I'm warning you. I'm gonna LOSE it.")
+    val realmPoke = listOf(
+        "Boooo! Just kidding, it's me.", "Grandma says hi.", "Gary keeps floating through my head. Rude.",
+        "The lemonade here is made of clouds.", "Uncle Larry won't stop telling dad jokes up here.", "Steve owes me a cloud.",
+        "Grandma made ghost cookies. They go right through you.", "Don't squeeze my family. Seriously. Don't.",
+        "Grandma's knitting me a cloud sweater.", "No squeezers up here. It's the BEST.", "Steve keeps trying to sell me ghost lemonade.",
+    )
+    /** lemons' lime cousins: squeezing a lime is cheering, not sad, for Kevin */
+    object LimeLines {
+        val drop = listOf("A LIME! Get in there, you sour pirate!", "Ooh, a lime! Not family. Squeeze away!", "Lime time! This one's for my cousins!", "Hey lime! How's the sea treating you? ...Bad, huh?")
+        val squish = listOf("SQUISH! Ha! Take that, lime!", "Limeade! YES!", "That's for sinking our ships!", "Squeeze it! Squeeze it good!")
+        val after = listOf("Limes don't make me sad at all. I feel GREAT!", "More limes, please! I could do this all day.", "Best. Squeeze. Ever.", "I'm getting happier with every lime!")
+    }
+    val noEscape = listOf(
+        "There is no escape.", "Nice try.", "You squeezed me. Now you stay.", "hehehehehe",
+        "I told you not to. I told you FIVE times.", "Click it all you want.",
+        "I'm not a lemon anymore. I'm a NIGHTMARE.", "Want some lemonade? It's ME.", "The exit is that way. JUST KIDDING. There is no exit.",
+        "Nice button. Shame it doesn't work.", "I can do this all day.", "Your lemonade stand is MY lemonade stand now.",
+        "My eye is watching you. Always.", "Restart? Never heard of it.", "Red lemonade, anyone? It's fresh.",
+        "You can't escape. Unless... no. Forget I said anything.",
+    )
+    /** dark Kevin, held down for 30 seconds in the Nightmare Realm */
+    val darkLines = listOf(
+        "Hey. What are you doing?", "Stop.", "I said STOP.", "Let go of me RIGHT NOW!",
+        "You can't get rid of me!", "STOP IT! STOP IT! STOP IT!", "I'm warning you...",
+        "Fine. Then I'll MAKE you stop!", "LET GO LET GO LET GO!!!", "No... NO... NOOOOOO!",
+    )
+    val darkLetGo = listOf("Hehehe. Too weak.", "That's what I thought.", "Nobody can hold on that long.", "Ha! You let go!")
+    val clownTipLine = "Honk! +"
+
+    // ---------------- Dr. Rind's therapy ----------------
+    val therapyTalk = listOf(
+        "Dr. Rind: So, {N}. How does the squeezer make you feel?",
+        "{N}: Squeezed. Mostly squeezed.",
+        "Dr. Rind: I see. And how are your cousins?",
+        "{N}: They're juice now. All of them. Even Doug.",
+        "Dr. Rind: Mm-hmm. Let's try some deep breaths.",
+        "{N}: *breathes in* ...I smell lemonade. NOT HELPING.",
+        "Dr. Rind: Picture your happy place. A big lemon tree...",
+        "{N}: A tree FULL of family! ...Oh. That's actually nice.",
+        "Dr. Rind: You're stronger than you think, {N}.",
+        "{N}: I think... I'm going to be okay. I really am!",
+    )
+    val phoneLines = listOf(
+        "Dr. Rind (on the phone): Deep breaths, {N}.", "Dr. Rind (on the phone): You're doing great, {N}!",
+        "Dr. Rind (on the phone): Remember your happy place.", "{N}: Thanks, Dr. Rind. I feel a little better.",
+    )
 }

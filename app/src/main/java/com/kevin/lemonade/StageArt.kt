@@ -11,13 +11,18 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.PathParser
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 
 // Everything here is drawn in the original SVG's 800 x 500 coordinates.
 val LINE = Color(0xFF3A2E12)
@@ -64,37 +69,53 @@ private fun metalDark(level: Int, x0: Float, x1: Float): Brush {
 }
 private val WOOD = Brush.verticalGradient(listOf(Color(0xFFE0A86E), Color(0xFFB07338)), startY = 400f, endY = 460f)
 
+/** day/night cycle: 4 minutes per loop, 0 = full day, 1 = dead of night (the original's nightNow) */
+const val DAY_LEN = 240000L
+fun nightFrac(timeMs: Long): Float {
+    val ph = (timeMs % DAY_LEN).toFloat() / DAY_LEN
+    return max(0f, sin(ph * 2 * PI.toFloat() - PI.toFloat() / 2))
+}
+/** cloud positions on the 800x500 stage: cx, cy, scale */
+val CLOUD_SPOTS = listOf(Triple(140f, 70f, 1f), Triple(520f, 52f, 0.8f), Triple(330f, 100f, 0.65f))
+
 fun DrawScope.drawStage(g: GameViewModel, timeMs: Long) {
     val press = g.lv("press")
+    val inRealm = g.inRealm()
+    val night = if (g.og || inRealm) 0f else nightFrac(timeMs)
 
     // sky
-    drawRect(SKY, Offset.Zero, Size(800f, 500f))
-    drawRect(Brush.verticalGradient(0f to Color.White.copy(alpha = 0f), 0.75f to Color.White.copy(alpha = 0.35f),
-        1f to Color.White.copy(alpha = 0.55f), startY = 0f, endY = 450f), Offset.Zero, Size(800f, 450f))
-    // drifting clouds
-    val drift = (timeMs / 1000f)
-    for ((i, c) in listOf(Triple(140f, 70f, 1f), Triple(520f, 52f, 0.8f), Triple(330f, 100f, 0.65f)).withIndex()) {
-        val x = (c.first + drift * (6f + 3 * i)) % 960f - 80f
-        val s = c.third
-        oval(x, c.second, 46f * s, 18f * s, Color.White, null)
-        oval(x + 30f * s, c.second - 12f * s, 30f * s, 20f * s, Color.White, null)
-        oval(x - 22f * s, c.second - 8f * s, 22f * s, 14f * s, Color.White, null)
+    val skyColor = if (inRealm) Color(0xFF2A1745) else SKY
+    drawRect(skyColor, Offset.Zero, Size(800f, 500f))
+    if (!inRealm) {
+        drawRect(Brush.verticalGradient(0f to Color.White.copy(alpha = 0f), 0.75f to Color.White.copy(alpha = 0.35f),
+            1f to Color.White.copy(alpha = 0.55f), startY = 0f, endY = 450f), Offset.Zero, Size(800f, 450f))
+        if (night > 0.02f) drawNightSky(night)
+        // drifting clouds (tap one to make it rain a lemon)
+        val drift = if (g.og) 0f else (timeMs / 1000f)
+        for ((i, c) in CLOUD_SPOTS.withIndex()) {
+            val x = (c.first + drift * (6f + 3 * i)) % 960f - 80f
+            val s = c.third
+            val cc = if (g.cute) Color(0xFFFFE6F4) else Color.White
+            oval(x, c.second, 46f * s, 18f * s, cc, null)
+            oval(x + 30f * s, c.second - 12f * s, 30f * s, 20f * s, cc, null)
+            oval(x - 22f * s, c.second - 8f * s, 22f * s, 14f * s, cc, null)
+        }
+        drawPath(svg("M0 452 Q120 380 260 440 T560 430 T800 420 L800 452 Z"), GRASS.copy(alpha = 0.55f))
+        drawSun(g, night)
+        if (night > 0.5f && !g.og) drawFireflies(timeMs, (night - 0.5f) * 2f)
     }
-    drawPath(svg("M0 452 Q120 380 260 440 T560 430 T800 420 L800 452 Z"), GRASS.copy(alpha = 0.55f))
-    // sun
-    drawCircle(Brush.radialGradient(0.55f to Color(0xB3FFF6B0), 1f to Color(0x00FFF6B0), center = Offset(720f, 70f), radius = 74f), 74f, Offset(720f, 70f))
-    drawCircle(Color(0xFFFFE66B), 42f, Offset(720f, 70f))
-    drawCircle(Color.White.copy(alpha = 0.35f), 13f, Offset(707f, 57f))
 
-    // grass, tufts, flowers
-    drawRect(GRASS, Offset(0f, 450f), Size(800f, 50f))
+    // grass, tufts, flowers (hidden in both realms, like the original)
+    drawRect(if (inRealm) Color(0xFF3E2A5C) else GRASS, Offset(0f, 450f), Size(800f, 50f))
     drawRect(Color.Black.copy(alpha = 0.08f), Offset(0f, 472f), Size(800f, 28f))
-    val tuft = Color.Black.copy(alpha = 0.18f)
-    for (d in listOf("M30 452 l-4 -10 M34 452 l0 -13 M38 452 l4 -10", "M250 455 l-4 -9 M254 455 l0 -12 M258 455 l4 -9",
-        "M720 454 l-4 -10 M724 454 l0 -13 M728 454 l4 -10", "M470 470 l-3 -8 M473 470 l0 -10 M476 470 l3 -8", "M95 478 l-3 -8 M98 478 l0 -10 M101 478 l3 -8"))
-        stroke(d, tuft, 2.5f)
-    for ((x, y, c) in listOf(Triple(60f, 470f, Color.White), Triple(290f, 482f, Color(0xFFFF9AC1)), Triple(760f, 476f, Color.White), Triple(610f, 488f, Color(0xFFB79CFF)))) {
-        drawCircle(c, 4f, Offset(x, y)); drawCircle(Color(0xFFFFD21F), 1.8f, Offset(x, y))
+    if (!inRealm) {
+        val tuft = Color.Black.copy(alpha = 0.18f)
+        for (d in listOf("M30 452 l-4 -10 M34 452 l0 -13 M38 452 l4 -10", "M250 455 l-4 -9 M254 455 l0 -12 M258 455 l4 -9",
+            "M720 454 l-4 -10 M724 454 l0 -13 M728 454 l4 -10", "M470 470 l-3 -8 M473 470 l0 -10 M476 470 l3 -8", "M95 478 l-3 -8 M98 478 l0 -10 M101 478 l3 -8"))
+            stroke(d, tuft, 2.5f)
+        for ((x, y, c) in listOf(Triple(60f, 470f, Color.White), Triple(290f, 482f, Color(0xFFFF9AC1)), Triple(760f, 476f, Color.White), Triple(610f, 488f, Color(0xFFB79CFF)))) {
+            drawCircle(c, 4f, Offset(x, y)); drawCircle(Color(0xFFFFD21F), 1.8f, Offset(x, y))
+        }
     }
 
     // table
@@ -103,7 +124,12 @@ fun DrawScope.drawStage(g: GameViewModel, timeMs: Long) {
     box(300f, 400f, 400f, 18f, WOOD, r = 4f)
     stroke("M308 405 H692", Color.White.copy(alpha = 0.35f), 3f)
 
-    if (g.lv("puppy") > 0) drawPuppy(timeMs)
+    if (g.lv("puppy") > 0 && !inRealm) drawPuppy(timeMs)
+    if (g.lv("shovel") > 0 && !inRealm) drawDigHole()
+    if (g.dating.momoWith && !inRealm) drawMomo(g)
+
+    if (g.realm.active) drawDeathRealm(g, timeMs)
+    if (g.realm.nightmare) drawNightmareRealm(g, timeMs)
 
     // the press
     box(354f, 130f, 16f, 242f, metalDark(press, 354f, 370f))
@@ -167,11 +193,15 @@ fun DrawScope.drawStage(g: GameViewModel, timeMs: Long) {
     stroke("M500 298 L620 298", w = 5f)
     stroke("M522 318 L526 380", Color.White.copy(alpha = 0.7f), 5f)
 
-    drawKevin(g)
+    if (!g.realm.nightmare && !g.realm.kevinGone) drawKevin(g, if (g.realm.active) 0.75f else 1f)
 
     // the "don't hold me" ring
     if (g.holdProgress > 0f) {
         drawArc(RED, -90f, 360f * g.holdProgress, false, Offset(42f, 172f), Size(256f, 256f), style = Stroke(7f, cap = StrokeCap.Round))
+    }
+    // holding dark Kevin, in the Nightmare Realm
+    if (g.realm.darkProgress > 0f) {
+        drawArc(Color(0xFFB79CFF), -90f, 360f * g.realm.darkProgress, false, Offset(42f, 172f), Size(256f, 256f), style = Stroke(7f, cap = StrokeCap.Round))
     }
 }
 
@@ -180,7 +210,18 @@ private fun fruitShade(cx: Float, cy: Float, rx: Float, ry: Float) = Brush.radia
     center = Offset(cx - rx + 0.7f * rx, cy - ry + 0.6f * ry), radius = 1.5f * maxOf(rx, ry)
 )
 
-private fun DrawScope.drawKevin(g: GameViewModel) {
+/** draws [block] at reduced opacity (ghosty, in the Death Realm) */
+private fun DrawScope.withAlpha(alpha: Float, block: DrawScope.() -> Unit) {
+    if (alpha >= 1f) { block(); return }
+    drawIntoCanvas { canvas ->
+        val paint = androidx.compose.ui.graphics.Paint().apply { this.alpha = alpha }
+        canvas.saveLayer(androidx.compose.ui.geometry.Rect(Offset.Zero, size), paint)
+        block()
+        canvas.restore()
+    }
+}
+
+private fun DrawScope.drawKevin(g: GameViewModel, alpha: Float = 1f) = withAlpha(alpha) {
     val s = g.sadFrac().toFloat()
     val peel = lerp(Color(0xFFFFD21F), Color(0xFFB9B5A0), s)
     val leaf = lerp(Color(0xFF3E9B4F), Color(0xFF7C7F6E), s)
@@ -189,8 +230,9 @@ private fun DrawScope.drawKevin(g: GameViewModel) {
     stroke("M148 398 L142 448", w = 5f); stroke("M192 398 L198 448", w = 5f)
     oval(136f, 452f, 18f, 9f, RED); oval(204f, 452f, 18f, 9f, RED)
 
+    val droop = if (g.sleeping) 6f else if (g.sleepy) 3f else 0f
     translate(g.kevinDx, g.kevinDy) {
-        rotate(g.kevinRot, Offset(170f, 400f)) {
+        rotate(g.kevinRot + droop, Offset(170f, 400f)) {
             stroke("M78 300 L44 340", w = 6f)
             rotate(g.armRot, Offset(262f, 300f)) { stroke("M262 300 L300 262", w = 6f) }
             oval(170f, 190f, 13f, 10f, peel)
@@ -204,8 +246,12 @@ private fun DrawScope.drawKevin(g: GameViewModel) {
             oval(118f, 318f, 15f, 9f, Color(0xFFFF9A8B), null, alpha = 0.75f)
             oval(222f, 318f, 15f, 9f, Color(0xFFFF9A8B), null, alpha = 0.75f)
 
-            // eyes follow whatever's happening
+            // eyes follow whatever's happening (closed if he's dozed off)
             for (c in listOf(Offset(142f, 276f), Offset(198f, 276f))) {
+                if (g.sleeping) {
+                    stroke("M${c.x - 10} ${c.y} Q${c.x} ${c.y + 6} ${c.x + 10} ${c.y}", LINE, 4f)
+                    continue
+                }
                 drawCircle(Color.White, 19f, c); drawCircle(LINE, 19f, c, style = Stroke(4f))
                 val dx = g.look.x - c.x; val dy = g.look.y - c.y
                 val d = hypot(dx, dy).let { if (it == 0f) 1f else it }
@@ -234,6 +280,14 @@ private fun DrawScope.drawKevin(g: GameViewModel) {
             }
         }
     }
+    if (g.sleeping) drawZzz(Offset(235f, 190f))
+}
+
+private fun DrawScope.drawZzz(p: Offset) {
+    for ((i, dp) in listOf(0f to 0f, 10f to -14f, 20f to -26f).withIndex()) {
+        val size = 10f + i * 3f
+        stroke("M${p.x + dp.first - size} ${p.y + dp.second} h${size * 2} l-${size * 2} ${size} h${size * 2}", Color(0xFF7B5CFF), 3f)
+    }
 }
 
 private fun DrawScope.drawPuppy(timeMs: Long) {
@@ -254,8 +308,156 @@ private fun DrawScope.drawPuppy(timeMs: Long) {
     }
 }
 
-/** is this scene point on Kevin? */
+/** is this scene point on Kevin? (also where shadow Kevin sits, in the Nightmare Realm) */
 fun onKevin(p: Offset): Boolean {
     val ex = (p.x - 170f) / 105f; val ey = (p.y - 300f) / 120f
     return ex * ex + ey * ey <= 1f || (p.x in 110f..230f && p.y in 390f..465f)
+}
+/** the sun, top-right: tap to go to Space (if unlocked) */
+fun onSun(p: Offset): Boolean { val dx = p.x - 720f; val dy = p.y - 70f; return dx * dx + dy * dy <= 56f * 56f }
+/** the dug hole next to the stand: tap to go Digging */
+fun onDigHole(p: Offset): Boolean = p.x in 505f..620f && p.y in 405f..500f
+/** Lemy, Kevin's girlfriend, standing by his feet */
+fun onMomo(p: Offset): Boolean { val dx = p.x - 80f; val dy = p.y - 445f; return dx * dx + dy * dy <= 34f * 34f }
+/** the puppy, to the right of the table */
+fun onPuppy(p: Offset): Boolean = p.x in 405f..470f && p.y in 405f..455f
+/** one of the drifting clouds, at the position it's drifted to by [timeMs] */
+fun onCloud(p: Offset, timeMs: Long, index: Int): Boolean {
+    val c = CLOUD_SPOTS[index]
+    val drift = timeMs / 1000f
+    val x = (c.first + drift * (6f + 3 * index)) % 960f - 80f
+    val dx = p.x - x; val dy = p.y - c.second
+    val r = 46f * c.third + 14f
+    return dx * dx + dy * dy <= r * r
+}
+/** a family ghost in the Death Realm, at its slot index */
+fun onGhost(p: Offset, index: Int): Boolean {
+    if (index !in Lines.famSlots.indices) return false
+    val (x, y) = Lines.famSlots[index]
+    val dx = (p.x - x) / 30f; val dy = (p.y - (y - 5f)) / 35f
+    return dx * dx + dy * dy <= 1f
+}
+/** the uncounted crowd of relatives, scattered across the sky in the Death Realm */
+fun onCrowd(p: Offset): Boolean = p.x in 290f..780f && p.y in 25f..250f
+
+private val STAR_SPOTS = listOf(
+    60f to 40f, 150f to 90f, 250f to 30f, 330f to 70f, 470f to 40f,
+    560f to 110f, 640f to 60f, 760f to 140f, 200f to 150f, 420f to 130f,
+)
+/** the night sky: stars + moon, fading in as the sun goes down */
+private fun DrawScope.drawNightSky(night: Float) {
+    val a = (night * 0.55f).coerceIn(0f, 1f)
+    drawRect(Color(0xFF0B1240).copy(alpha = a), Offset.Zero, Size(800f, 450f))
+    for ((x, y) in STAR_SPOTS) drawCircle(Color.White.copy(alpha = a), 2f, Offset(x, y))
+    drawCircle(Color(0xFFF6F0C8).copy(alpha = a), 26f, Offset(120f, 80f))
+    drawCircle(Color(0xFF0B1240).copy(alpha = a), 22f, Offset(132f, 72f))
+}
+/** fireflies over the grass at night */
+private fun DrawScope.drawFireflies(timeMs: Long, alpha: Float) {
+    val spots = listOf(90f to 400f, 260f to 420f, 610f to 380f, 740f to 430f, 480f to 440f)
+    for ((i, s) in spots.withIndex()) {
+        val flick = 0.5f + 0.5f * sin(timeMs / 420f + i * 1.7f)
+        drawCircle(Color(0xFFF6F07A).copy(alpha = alpha * flick), 3f, Offset(s.first, s.second))
+    }
+}
+/** the sun (or, at night, the Milky Way): tap to go to Space once you own the telescope */
+private fun DrawScope.drawSun(g: GameViewModel, night: Float) {
+    val unlocked = g.lv("telescope") > 0 || g.bypassLocks
+    if (unlocked) drawCircle(Brush.radialGradient(0.55f to Color(0xB3FFF6B0), 1f to Color(0x00FFF6B0), center = Offset(720f, 70f), radius = 74f), 74f, Offset(720f, 70f))
+    drawCircle(Color(0xFFFFE66B).copy(alpha = 1f - night * 0.95f), 42f, Offset(720f, 70f))
+    drawCircle(Color.White.copy(alpha = 0.35f * (1f - night)), 13f, Offset(707f, 57f))
+    if (night > 0.5f) {
+        val a = night
+        drawOval(Color(0xFFB9A8FF).copy(alpha = 0.28f * a), Offset(580f, 52f), Size(240f, 56f))
+        drawCircle(Color(0xFFFFF6E0).copy(alpha = 0.9f * a), 14f, Offset(700f, 80f))
+    }
+}
+/** the hole next to the stand, once you've bought a shovel: tap to go Digging */
+private fun DrawScope.drawDigHole() {
+    oval(560f, 486f, 44f, 11f, Color(0xFF5E3C20))
+    oval(560f, 488f, 34f, 7f, Color(0xFF1A1008), null)
+    stroke("M612 488 L630 430", Color(0xFF6B4A1E), 5f)
+    shape("M622 430 L638 430 L636 418 Q630 410 624 418 Z", Color(0xFF9AA7B1), w = 2f)
+}
+/** Lemy, by Kevin's feet, once he's dating her */
+private fun DrawScope.drawMomo(g: GameViewModel) {
+    translate(80f, 445f) {
+        oval(0f, 10f, 22f, 6f, Color.Black, null, alpha = 0.14f)
+        oval(0f, 0f, 24f, 27f, Color(0xFFFFD21F), w = 3f)
+        drawCircle(Color.White, 6f, Offset(-7f, -3f)); drawCircle(LINE, 6f, Offset(-7f, -3f), style = Stroke(2f))
+        drawCircle(Color.White, 6f, Offset(7f, -3f)); drawCircle(LINE, 6f, Offset(7f, -3f), style = Stroke(2f))
+        drawCircle(LINE, 2.5f, Offset(-7f, -3f)); drawCircle(LINE, 2.5f, Offset(7f, -3f))
+        stroke("M-6 8 Q0 13 6 8", LINE, 3f)
+        // pink bow
+        shape("M-6 -22 L0 -16 L6 -22 L4 -14 L0 -17 L-4 -14 Z", Color(0xFFFF7FB0), w = 2f)
+    }
+}
+
+/** ghosts in the Death Realm: tap one to squeeze it (don't!) */
+private fun DrawScope.drawGhost(x: Float, y: Float, done: Boolean) {
+    if (done) return
+    translate(x, y) {
+        oval(0f, -34f, 16f, 5f, Color(0xFFFFE66B), null)
+        shape("M-24 8 C-24 -32 24 -32 24 8 L24 22 Q16 14 12 22 Q4 14 0 22 Q-4 14 -12 22 Q-16 14 -24 22 Z", Color(0xFFFFF9D6).copy(alpha = 0.9f), w = 3f)
+        drawCircle(LINE, 3.5f, Offset(-8f, -2f)); drawCircle(LINE, 3.5f, Offset(8f, -2f))
+        stroke("M-6 8 Q0 13 6 8", LINE, 3f)
+    }
+}
+private fun DrawScope.drawCrowdGhost(x: Float, y: Float, s: Float) {
+    scale(s, s, Offset(x, y)) {
+        translate(x, y) {
+            shape("M-24 8 C-24 -32 24 -32 24 8 L24 22 Q16 14 12 22 Q4 14 0 22 Q-4 14 -12 22 Q-16 14 -24 22 Z", Color(0xFFFFF9D6).copy(alpha = 0.75f), w = 3f)
+            drawCircle(LINE, 3.5f, Offset(-8f, -2f)); drawCircle(LINE, 3.5f, Offset(8f, -2f))
+        }
+    }
+}
+/** the Death Realm: Kevin's ghost family, floating above the stand */
+private fun DrawScope.drawDeathRealm(g: GameViewModel, timeMs: Long) {
+    val r = g.realm
+    for (i in 0 until r.famCount.toInt().coerceAtMost(Lines.famSlots.size)) {
+        val (x, y) = Lines.famSlots[i]
+        val bob = sin(timeMs / 500f + i) * 4f
+        drawGhost(x, y + bob, r.famDone.getOrElse(i) { false })
+    }
+    val n = min(r.famExtra, 28L).toInt()
+    for (i in 0 until n) {
+        val x = 300f + ((i * 137) % 470)
+        val y = 40f + ((i * 89) % 200)
+        val s = 0.38f + ((i * 7) % 5) * 0.03f
+        drawCrowdGhost(x, y, s)
+    }
+    r.deadWearing?.let { drawDeadOutfit(it) }
+}
+
+/** the shadow Kevin you have to hold down for ~30 seconds to escape the Nightmare Realm */
+private fun DrawScope.drawNightmareRealm(g: GameViewModel, timeMs: Long) {
+    val jitter = if (g.realm.darkProgress > 0f) (kotlin.random.Random.nextFloat() - 0.5f) * (2f + g.realm.darkProgress * 14f) else 0f
+    translate(jitter, jitter / 2f) {
+        shape("M98 268 C98 188 242 188 242 268 L242 322 Q218 294 206 322 Q184 294 170 322 Q156 294 134 322 Q122 294 98 322 Z",
+            Color(0xFF0E0003).copy(alpha = 0.92f), line = null)
+        drawCircle(Color(0xFFFF1A2E), 8f, Offset(154f, 288f))
+        drawCircle(Color(0xFFFF1A2E), 8f, Offset(186f, 288f))
+        stroke("M144 314 L154 322 L164 314 L174 322 L184 314 L194 322", Color(0xFFFF1A2E), 3f)
+    }
+    // the angry moon
+    drawCircle(Color(0xFFFFE9E9), 46f, Offset(720f, 70f))
+    drawCircle(Color(0xFFC0001A), 20f, Offset(712f, 72f))
+}
+/** the dead closet: a Death Realm-only outfit drawn over Kevin */
+private fun DrawScope.drawDeadOutfit(id: String) {
+    when (id) {
+        "sheet" -> {
+            shape("M74 300 Q74 186 170 186 Q266 186 266 300 L266 420 Q246 404 226 420 Q206 404 186 420 Q166 404 146 420 Q126 404 106 420 Q90 406 74 420 Z",
+                Color.White.copy(alpha = 0.85f))
+            oval(142f, 276f, 14f, 18f, Color(0xFF1A1A1A), null); oval(198f, 276f, 14f, 18f, Color(0xFF1A1A1A), null)
+        }
+        "skeleton" -> {
+            stroke("M170 350 V410", Color.White, 6f); stroke("M130 360 Q170 350 210 360", Color.White, 6f)
+            drawCircle(Color(0xFF1A1A1A), 22f, Offset(142f, 276f)); drawCircle(Color(0xFF1A1A1A), 22f, Offset(198f, 276f))
+        }
+        "vampire" -> {
+            shape("M86 340 L60 230 L120 300 Z", Color(0xFF1A1A1A)); shape("M254 340 L280 230 L220 300 Z", Color(0xFF1A1A1A))
+            shape("M100 340 Q170 380 240 340 L250 360 Q170 404 90 360 Z", Color(0xFF8A0012))
+        }
+    }
 }

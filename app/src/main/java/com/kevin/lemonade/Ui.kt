@@ -95,6 +95,7 @@ fun ChunkyButton(
     color: Color = PEEL,
     textColor: Color = LINE,
     big: Boolean = false,
+    small: Boolean = false,
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
@@ -103,16 +104,16 @@ fun ChunkyButton(
         modifier
             .alpha(if (enabled) 1f else 0.5f)
             .background(LINE, shape)
-            .padding(bottom = 5.dp)
+            .padding(bottom = if (small) 4.dp else 5.dp)
             .clip(shape)
             .background(color)
-            .border(3.dp, LINE, shape)
+            .border((if (small) 2 else 3).dp, LINE, shape)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = if (big) 14.dp else 10.dp),
+            .padding(horizontal = if (small) 10.dp else 20.dp, vertical = if (big) 14.dp else if (small) 6.dp else 10.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, color = textColor, fontFamily = if (big) Lilita else Nunito, fontWeight = FontWeight.Black,
-            fontSize = if (big) 24.sp else 16.sp, textAlign = TextAlign.Center)
+            fontSize = if (big) 24.sp else if (small) 12.sp else 16.sp, textAlign = TextAlign.Center)
     }
 }
 
@@ -136,24 +137,33 @@ fun MoneyText(g: GameViewModel, size: Int = 30) {
 }
 
 // ======================= the lemonade stand =======================
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun StandScreen(g: GameViewModel) {
     var confirmRestart by remember { mutableStateOf(false) }
     var showInfo by remember { mutableStateOf(false) }
+    var showDeadCloset by remember { mutableStateOf(false) }
+    val r = g.realm
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            MoneyText(g)
+            MoneyText(g, size = 24)
             Spacer(Modifier.weight(1f))
-            ChunkyButton("Settings", color = CARD) { g.screen = Screen.SETTINGS }
-            Spacer(Modifier.width(6.dp))
-            ChunkyButton("Codes", color = CARD) { g.screen = Screen.CODES }
-            Spacer(Modifier.width(6.dp))
-            ChunkyButton("Restart", color = CARD) { confirmRestart = true }
+            ChunkyButton("Settings", color = CARD, small = true) { g.screen = Screen.SETTINGS }
+            Spacer(Modifier.width(4.dp))
+            ChunkyButton("Codes", color = CARD, small = true) { g.screen = Screen.CODES }
+            Spacer(Modifier.width(4.dp))
+            ChunkyButton("Restart", color = CARD, small = true) { confirmRestart = true }
         }
-        OutlinedTitle("${g.name} watches the lemonade get made")
+        OutlinedTitle(
+            if (r.nightmare) "There is no escape"
+            else if (r.active) "Welcome to the Death Realm"
+            else if (r.kevinGone) "Lemonade without ${g.name}"
+            else "${g.name} watches the lemonade get made",
+            size = 26,
+        )
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Your lemon friend's name:", fontSize = 15.sp)
@@ -170,26 +180,65 @@ fun StandScreen(g: GameViewModel) {
         }
         Spacer(Modifier.height(8.dp))
         SadMeter(g)
+        r.warningText()?.let {
+            Text(it, color = RED, fontWeight = FontWeight.Black, fontSize = 14.sp, textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 4.dp))
+        }
         Spacer(Modifier.height(10.dp))
         Stage(g)
         Spacer(Modifier.height(14.dp))
         ChunkyButton(
-            text = if (g.cranking) "Crank! (${g.crankN}/${g.crankNeed})" else "Squeeze a lemon",
+            text = when {
+                g.cranking -> "Crank! (${g.crankN}/${g.crankNeed})"
+                r.nightmare -> r.escapeButtonLabel()
+                r.active -> "Escape the death realm"
+                g.limesLeft > 0 -> "Squeeze a lime (${g.limesLeft} left)"
+                else -> "Squeeze a lemon"
+            },
             big = true,
             enabled = !g.busy || g.cranking,
             modifier = Modifier.fillMaxWidth(0.85f),
         ) { g.mainButton() }
         Spacer(Modifier.height(6.dp))
-        val out = g.lemonsLeft <= 0
-        Text(if (out) "Out of lemons! Go catch more below." else "Lemons: ${g.lemonsLeft} / ${g.lemonCap()}",
-            color = if (out) RED else LINE, fontWeight = FontWeight.Black, fontSize = 17.sp)
-        Text("Pitchers sold: ${g.glasses}", fontSize = 15.sp)
-        Glasses(g.glasses)
-        Spacer(Modifier.height(6.dp))
-        Text(g.priceText(), fontSize = 14.sp, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(14.dp))
+        if (!r.active && !r.nightmare) {
+            val out = g.lemonsLeft <= 0 && g.limesLeft <= 0
+            Text(if (out) "Out of lemons! Go catch more below." else "Lemons: ${g.lemonsLeft} / ${g.lemonCap()}",
+                color = if (out) RED else LINE, fontWeight = FontWeight.Black, fontSize = 17.sp)
+            Text("Pitchers sold: ${g.glasses}", fontSize = 15.sp)
+            Glasses(g.glasses)
+            Spacer(Modifier.height(6.dp))
+            Text(g.priceText(), fontSize = 14.sp, textAlign = TextAlign.Center)
+        }
+        Spacer(Modifier.height(10.dp))
 
-        Hub(g)
+        // visit the Death Realm, or bring Kevin back
+        if (r.visitLabel().isNotEmpty()) {
+            ChunkyButton(r.visitLabel(), color = Color(0xFF6A4BE8), textColor = Color.White,
+                enabled = r.canVisit(), modifier = Modifier.fillMaxWidth(0.85f)) { r.visit() }
+            Spacer(Modifier.height(10.dp))
+        }
+        // realm extras: themed wars and digs, only while visiting
+        if (r.active || r.nightmare) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (r.active) {
+                    ChunkyButton("Death War", color = Color(0xFF6A4BE8), textColor = Color.White) {
+                        g.warTheme = "death"; g.screen = Screen.WAR
+                    }
+                    ChunkyButton("Dead Closet", color = Color(0xFF6A4BE8), textColor = Color.White) { showDeadCloset = true }
+                }
+                if (r.nightmare) {
+                    ChunkyButton("Broken War", color = Color(0xFF6A4BE8), textColor = Color.White) {
+                        g.warTheme = "broken"; g.screen = Screen.WAR
+                    }
+                    ChunkyButton("Horrible Hole", color = Color(0xFF6A4BE8), textColor = Color.White) {
+                        g.mineTheme = "horrible"; g.screen = Screen.DIG
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
+
+        if (!r.active && !r.nightmare) Hub(g)
         Spacer(Modifier.height(10.dp))
         Text(if (showInfo) "Hide info" else "More info", fontWeight = FontWeight.Black,
             modifier = Modifier.clickable { showInfo = !showInfo }.padding(8.dp))
@@ -212,6 +261,30 @@ fun StandScreen(g: GameViewModel) {
             text = { Text("All your money, lemons and upgrades will be gone.") },
             confirmButton = { TextButton({ confirmRestart = false; g.restart() }) { Text("Restart", color = RED) } },
             dismissButton = { TextButton({ confirmRestart = false }) { Text("Keep playing") } },
+            containerColor = CARD,
+        )
+    }
+    if (showDeadCloset) {
+        AlertDialog(
+            onDismissRequest = { showDeadCloset = false },
+            title = { Text("The Dead Closet", fontFamily = Lilita, fontSize = 22.sp) },
+            text = {
+                Column {
+                    Text("Only in the Death Realm. Ghost squeezes pay 50% more while you're wearing one.", fontSize = 13.sp)
+                    Spacer(Modifier.height(8.dp))
+                    for (item in RealmState.DEAD) {
+                        val owned = r.deadOwned[item.id] == true
+                        val on = r.deadWearing == item.id
+                        Text(
+                            "${item.name} - ${if (on) "wearing it! tap to take off" else if (owned) "tap to wear" else "buy for ${fmt(item.price)}"}",
+                            fontWeight = FontWeight.Black, fontSize = 14.sp,
+                            color = if (on) Color(0xFF3E9B4F) else LINE,
+                            modifier = Modifier.fillMaxWidth().clickable { r.buyOrWearDead(item.id) }.padding(vertical = 6.dp),
+                        )
+                    }
+                }
+            },
+            confirmButton = { TextButton({ showDeadCloset = false }) { Text("Close") } },
             containerColor = CARD,
         )
     }
@@ -247,6 +320,16 @@ fun Glasses(n: Int) {
     }
 }
 
+private fun famGhostIndexAt(g: GameViewModel, p: Offset): Int {
+    val n = g.realm.famCount.toInt().coerceAtMost(Lines.famSlots.size)
+    for (i in 0 until n) if (g.realm.famDone.getOrElse(i) { true }.not() && onGhost(p, i)) return i
+    return -1
+}
+private fun cloudIndexAt(p: Offset, timeMs: Long): Int {
+    for (i in CLOUD_SPOTS.indices) if (onCloud(p, timeMs, i)) return i
+    return -1
+}
+
 @Composable
 fun Stage(g: GameViewModel) {
     var time by remember { mutableLongStateOf(0L) }
@@ -257,26 +340,52 @@ fun Stage(g: GameViewModel) {
             .background(LINE, shape).padding(bottom = 6.dp) // chunky shadow under the stage
             .aspectRatio(800f / 500f)
             .clip(shape).border(4.dp, LINE, shape)
+            .graphicsLayer { rotationZ = if (g.upside) 180f else 0f }
     ) {
         Canvas(
             Modifier.fillMaxSize().pointerInput(Unit) {
                 awaitEachGesture {
                     val sc = size.width / 800f
                     val down = awaitFirstDown()
-                    val p = down.position / sc
-                    val kevin = onKevin(p)
-                    if (kevin) g.kevinDown() else { g.lookAtTouch(p); g.crankTap() }
+                    val raw = down.position / sc
+                    val p = if (g.upside) Offset(800f - raw.x, 500f - raw.y) else raw
+                    val onShadow = g.realm.nightmare && onKevin(p)
+                    val onFriend = !g.realm.nightmare && !g.realm.active && onKevin(p)
+                    val ghostIdx = if (g.realm.active) famGhostIndexAt(g, p) else -1
+                    when {
+                        onShadow -> g.realm.shadowDown()
+                        onFriend -> g.kevinDown()
+                        ghostIdx >= 0 -> g.realm.squeezeGhost(ghostIdx)
+                        g.realm.active && g.realm.famExtra > 0 && onCrowd(p) -> g.realm.squeezeCrowd()
+                        !g.realm.active && !g.realm.nightmare && onSun(p) -> {
+                            if (g.lv("telescope") > 0 || g.bypassLocks) g.screen = Screen.SPACE
+                            else g.toast("You need a telescope to go to space! Buy one in the Shop under Tools.")
+                        }
+                        !g.realm.active && !g.realm.nightmare && g.lv("shovel") > 0 && onDigHole(p) -> g.screen = Screen.DIG
+                        !g.realm.active && !g.realm.nightmare && g.dating.momoWith && onMomo(p) -> g.screen = Screen.DATE
+                        !g.realm.active && !g.realm.nightmare && g.lv("puppy") > 0 && onPuppy(p) -> g.petPuppy()
+                        !g.realm.active && !g.realm.nightmare && !g.og && cloudIndexAt(p, time) >= 0 -> g.rainCloud(cloudIndexAt(p, time))
+                        else -> { g.lookAtTouch(p); g.crankTap() }
+                    }
                     while (true) {
                         val ev = awaitPointerEvent()
                         val c = ev.changes.firstOrNull() ?: break
-                        if (!kevin) g.lookAtTouch(c.position / sc)
+                        if (!onFriend && !onShadow) {
+                            val cr = c.position / sc
+                            g.lookAtTouch(if (g.upside) Offset(800f - cr.x, 500f - cr.y) else cr)
+                        }
                         if (!c.pressed) break
                     }
-                    if (kevin) g.kevinUp()
+                    if (onFriend) g.kevinUp()
+                    if (onShadow) g.realm.shadowUp()
                 }
             }
         ) {
             scale(size.width / 800f, size.width / 800f, Offset.Zero) { drawStage(g, time) }
+            if (g.disco) {
+                val hue = ((time / 11f) % 360f)
+                drawRect(androidx.compose.ui.graphics.Color.hsv(hue, 0.55f, 1f, alpha = 0.16f), Offset.Zero, androidx.compose.ui.geometry.Size(size.width, size.height))
+            }
         }
 
         // speech bubble
