@@ -83,6 +83,10 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     var crankN by mutableIntStateOf(0)
     var crankNeed by mutableIntStateOf(0)
     var catchNudge by mutableIntStateOf(0)
+    /** dozing off at night, when nothing else is going on (the original's .sleeping/.sleepy classes) */
+    var sleeping by mutableStateOf(false)
+    var sleepy by mutableStateOf(false)
+    private var idleAnimT = 0
     var moneyBump by mutableIntStateOf(0)
     var zestSays by mutableStateOf(Lines.zestHello.first())
     var partyUntil by mutableLongStateOf(0L)
@@ -548,7 +552,15 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         popAt("Honk! +${fmt(tip)}", 0.22f, 0.30f)
     }
 
+    /** nothing is happening, so Kevin can doze off, look around, or wave (the original's kevinFree()) */
+    private fun kevinFree() = !busy && !realm.active && !realm.nightmare && !realm.kevinGone && !therapy.atTherapy && holdStart == 0L
+
     fun kevinDown() {
+        if (sleeping) {
+            sleeping = false; idleAnimT = 0; showFace(Face.HAPPY)
+            say(listOf("Huh?! I'm awake! I wasn't sleeping!", "*yawn* Five more minutes...", "I was just resting my eyes!").pick())
+            return
+        }
         clownTip()
         if (busy && !realm.nightmare && !realm.active) { therapyTap(); return }
         if (busy || realm.nightmare || holdStart != 0L) return
@@ -698,6 +710,12 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             secAcc += 100
             if (secAcc < 1000) continue
             secAcc = 0; sec++
+
+            // dozing off at night, once nothing's been going on for a few seconds
+            if (kevinFree() && !inAnotherWorld()) idleAnimT++ else idleAnimT = 0
+            val night = nightFrac(now)
+            sleeping = night > 0.75f && kevinFree() && !inAnotherWorld() && idleAnimT > 6
+            sleepy = night > 0.5f && !sleeping && kevinFree() && !inAnotherWorld()
 
             if (lv("billboard") > 0 && ++billT >= 5) { billT = 0; money += max(1L, Math.round(price() * 0.3 * lv("billboard"))) }
             if (lv("factory") > 0 && ++factoryT >= 32 - 5 * lv("factory")) { factoryT = 0; money += price() }

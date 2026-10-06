@@ -230,8 +230,9 @@ private fun DrawScope.drawKevin(g: GameViewModel, alpha: Float = 1f) = withAlpha
     stroke("M148 398 L142 448", w = 5f); stroke("M192 398 L198 448", w = 5f)
     oval(136f, 452f, 18f, 9f, RED); oval(204f, 452f, 18f, 9f, RED)
 
+    val droop = if (g.sleeping) 6f else if (g.sleepy) 3f else 0f
     translate(g.kevinDx, g.kevinDy) {
-        rotate(g.kevinRot, Offset(170f, 400f)) {
+        rotate(g.kevinRot + droop, Offset(170f, 400f)) {
             stroke("M78 300 L44 340", w = 6f)
             rotate(g.armRot, Offset(262f, 300f)) { stroke("M262 300 L300 262", w = 6f) }
             oval(170f, 190f, 13f, 10f, peel)
@@ -245,8 +246,12 @@ private fun DrawScope.drawKevin(g: GameViewModel, alpha: Float = 1f) = withAlpha
             oval(118f, 318f, 15f, 9f, Color(0xFFFF9A8B), null, alpha = 0.75f)
             oval(222f, 318f, 15f, 9f, Color(0xFFFF9A8B), null, alpha = 0.75f)
 
-            // eyes follow whatever's happening
+            // eyes follow whatever's happening (closed if he's dozed off)
             for (c in listOf(Offset(142f, 276f), Offset(198f, 276f))) {
+                if (g.sleeping) {
+                    stroke("M${c.x - 10} ${c.y} Q${c.x} ${c.y + 6} ${c.x + 10} ${c.y}", LINE, 4f)
+                    continue
+                }
                 drawCircle(Color.White, 19f, c); drawCircle(LINE, 19f, c, style = Stroke(4f))
                 val dx = g.look.x - c.x; val dy = g.look.y - c.y
                 val d = hypot(dx, dy).let { if (it == 0f) 1f else it }
@@ -274,6 +279,14 @@ private fun DrawScope.drawKevin(g: GameViewModel, alpha: Float = 1f) = withAlpha
                 Face.GASP -> oval(170f, 338f, 12f, 16f, Color(0xFF8C2F2F))
             }
         }
+    }
+    if (g.sleeping) drawZzz(Offset(235f, 190f))
+}
+
+private fun DrawScope.drawZzz(p: Offset) {
+    for ((i, dp) in listOf(0f to 0f, 10f to -14f, 20f to -26f).withIndex()) {
+        val size = 10f + i * 3f
+        stroke("M${p.x + dp.first - size} ${p.y + dp.second} h${size * 2} l-${size * 2} ${size} h${size * 2}", Color(0xFF7B5CFF), 3f)
     }
 }
 
