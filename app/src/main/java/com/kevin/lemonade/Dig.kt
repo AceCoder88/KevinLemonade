@@ -135,6 +135,8 @@ class DigState(val g: GameViewModel) : Feature {
     private var warned = false
     /** where the player is currently holding on the canvas, in world pixels (null = not holding) */
     var heldPoint: Offset? = null
+    /** set once you've ever dug up a diamond - for the Trophies screen (the original's dugDiamond) */
+    var dugDiamond by mutableStateOf(false)
 
     private fun luckMult() = 1.0 + 0.25 * lv("lucky") + 0.2 * g.lv("oreluck")
 
@@ -187,6 +189,7 @@ class DigState(val g: GameViewModel) : Feature {
     private fun collect(cell: DigCell, r: Int, c: Int) {
         val oreId = cell.ore ?: return
         val info = ORES[oreId] ?: return
+        if (oreId == "diamond") dugDiamond = true
         val horrible = theme == DigTheme.HORRIBLE
         val v = Math.round(info.value * (1 + 0.25 * lv("polish")) * (if (horrible) 3.0 else 1.0))
         g.money += v
@@ -304,15 +307,21 @@ class DigState(val g: GameViewModel) : Feature {
 
     override fun save(j: JSONObject) {
         j.put("lvl", JSONObject(lvl.toMap()))
+        j.put("dugDiamond", dugDiamond)
     }
     override fun load(j: JSONObject) {
         j.optJSONObject("lvl")?.let { o -> o.keys().forEach { lvl[it] = o.getInt(it) } }
+        dugDiamond = j.optBoolean("dugDiamond", false)
     }
     override fun reset() {
         lvl.clear(); theme = DigTheme.NORMAL; worlds.clear(); diggers.clear(); floats.clear()
-        bannerOn = false; warned = false; heldPoint = null
+        bannerOn = false; warned = false; heldPoint = null; dugDiamond = false
     }
-    override fun maxOut() { for (u in DigShop.all) lvl[u.id] = u.max }
+    /** the secret MAX OUT code: matches the original's maxEverything() for the mineShop (8502-8526) */
+    override fun maxOut() {
+        for (u in DigShop.all) lvl[u.id] = u.max
+        syncDiggers()
+    }
 }
 
 @Composable

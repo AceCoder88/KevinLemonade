@@ -325,7 +325,12 @@ class PirateState(val g: GameViewModel) : Feature {
         foes.clear(); balls.clear(); booms.clear(); floats.clear(); allies.clear()
         bannerOn = false; kevinLineOn = false
     }
-    override fun maxOut() { for (u in PirateShop.all) lvl[u.id] = u.max }
+    /** the secret MAX OUT code: matches the original's maxEverything() for the pirateShop (8502-8526) */
+    override fun maxOut() {
+        for (u in PirateShop.all) lvl[u.id] = u.max
+        shipHp = shipMax().toFloat()
+        syncAllies()
+    }
 }
 
 @Composable
