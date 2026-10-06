@@ -126,6 +126,47 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     /** true while Kevin is in the Death Realm or the Nightmare Realm (the original's realm || nightmare) */
     fun inRealm(): Boolean = false
 
+    // ---------------- shared state the original kept at the top of its script ----------------
+    // Several features set these (surprise events, codes, the admin panel, the traveling shop, the
+    // wizard tower...) and others read them (the squeeze, earn(), war). Same names as the original.
+    // Timers are SystemClock.uptimeMillis() deadlines, like partyUntil; "now < xUntil" means active.
+    var frenzyUntil by mutableLongStateOf(0L)
+    var megaUntil by mutableLongStateOf(0L)
+    var freeLemonsUntil by mutableLongStateOf(0L)
+    var robotRushUntil by mutableLongStateOf(0L)
+    var happyUntil by mutableLongStateOf(0L)
+    var stormUntil by mutableLongStateOf(0L)
+    var moneyTreeUntil by mutableLongStateOf(0L)
+    var bondPrinterUntil by mutableLongStateOf(0L)
+    var goldBondsUntil by mutableLongStateOf(0L)
+    var superTowersUntil by mutableLongStateOf(0L)
+    /** the original's window.__rainbow: double money until then */
+    var rainbowUntil by mutableLongStateOf(0L)
+    /** the original's window.__speedUntil / __speedMult: squeezing speed boost */
+    var speedUntil by mutableLongStateOf(0L)
+    var speedMult by mutableDoubleStateOf(2.0)
+    /** the next this-many squeezes are guaranteed golden */
+    var goldenNext by mutableIntStateOf(0)
+    /** extra wall health for the war */
+    var wallBonus by mutableIntStateOf(0)
+    /** archer windows filled on the war wall (0..6) */
+    var wallArchers by mutableIntStateOf(0)
+    /** Death Realm visits so far (doom() grows with these) */
+    var visits by mutableIntStateOf(0)
+    var gender by mutableStateOf("boy")
+    /** Settings: what Kevin talks about */
+    val talk = mutableStateMapOf("lemons" to true, "upgrades" to true, "outfits" to true, "phone" to true, "poke" to true, "bubble" to true)
+    /** looks: cute mode, OG mode (looks like the very first version), and the disco / upside-down codes */
+    var cute by mutableStateOf(false)
+    var og by mutableStateOf(false)
+    var disco by mutableStateOf(false)
+    var upside by mutableStateOf(false)
+    /** admin panel: open every tool lock without owning the tool */
+    var bypassLocks by mutableStateOf(false)
+    fun luck() = 0.04 * (lv("clover") + lv("horseshoe") + lv("rabbitfoot"))
+    fun dodge() = 0.06 * lv("dodgeluck")
+    fun now() = SystemClock.uptimeMillis()
+
     fun lv(id: String) = lvl[id] ?: 0
     fun llv(id: String) = lemonLvl[id] ?: 0
 

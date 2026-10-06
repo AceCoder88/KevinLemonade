@@ -32,14 +32,14 @@ fun Hub(g: GameViewModel) {
         HubTab.SHOPS -> listOf(
             Place("🛒 Open the Shop", RED, show = true) { g.openShop() },
             Place("🎒 Traveling Shop", Color(0xFF2E8B9E), show = true) { g.screen = Screen.TRAVEL },
-            Place("👚 ${g.name}'s Closet", Color(0xFFFF7FB0), LINE, show = g.lv("closetkey") > 0) { g.screen = Screen.CLOSET },
+            Place("👚 ${g.name}'s Closet", Color(0xFFFF7FB0), LINE, show = (g.lv("closetkey") > 0 || g.bypassLocks)) { g.screen = Screen.CLOSET },
         )
         HubTab.WORLDS -> listOf(
             Place("🍋 Catch the Lemons", Color(0xFFE8B90F), LINE, show = true) { g.screen = Screen.CATCH },
-            Place("⚔️ Go to War", Color(0xFF6B7A3A), show = g.lv("bow") > 0) { g.screen = Screen.WAR },
-            Place("🚀 Space", Color(0xFF141A3A), PEEL, show = g.lv("telescope") > 0 && !realm) { g.screen = Screen.SPACE },
+            Place("⚔️ Go to War", Color(0xFF6B7A3A), show = (g.lv("bow") > 0 || g.bypassLocks)) { g.screen = Screen.WAR },
+            Place("🚀 Space", Color(0xFF141A3A), PEEL, show = (g.lv("telescope") > 0 || g.bypassLocks) && !realm) { g.screen = Screen.SPACE },
             Place("⛏️ Dig", Color(0xFF6B4A1E), Color(0xFFFFF6E0), show = g.lv("shovel") > 0 && !realm) { g.screen = Screen.DIG },
-            Place("🏴‍☠️ Be a Pirate", Color(0xFF1E4E6E), PEEL, show = g.lv("map") > 0 && !realm) { g.screen = Screen.PIRATE },
+            Place("🏴‍☠️ Be a Pirate", Color(0xFF1E4E6E), PEEL, show = (g.lv("map") > 0 || g.bypassLocks) && !realm) { g.screen = Screen.PIRATE },
             Place("🐎 Ride the Horse", Color(0xFF8B5A2B), show = g.lv("saddle") > 0 || g.closet.wearingSet("cowboy")) { g.screen = Screen.RIDE },
             Place("🧙 Wizard Tower", Color(0xFF4B2E9E),
                 show = g.lv("wand") > 0 || g.closet.wearingSet("wizard") || g.closet.wearingSet("witch")) { g.screen = Screen.TOWER },
@@ -51,7 +51,7 @@ fun Hub(g: GameViewModel) {
             Place("✨ Rebirth", Color(0xFF7B5CFF), show = true) { g.screen = Screen.REBIRTH },
         )
         HubTab.KEVIN -> listOf(
-            Place("🛋️ Send ${g.name} to therapy (\$50)", Color(0xFF7B5CFF), show = g.lv("pager") > 0) { g.screen = Screen.THERAPY },
+            Place("🛋️ Send ${g.name} to therapy (\$50)", Color(0xFF7B5CFF), show = (g.lv("pager") > 0 || g.bypassLocks)) { g.screen = Screen.THERAPY },
             Place("💘 Dating app", Color(0xFFFF4D8D), show = g.dating.momoWith || g.lv("girlfriend") > 0) { g.screen = Screen.DATE },
         )
         HubTab.HELP -> emptyList()
