@@ -200,7 +200,7 @@ class WarSim(val war: WarState) {
     fun makeSarge(): WSoldier {
         val hp = (160.0 + 20 * wl("armor")) * (if (g.closet.wearingSet("soldier")) 2.0 else 1.0)
         val dmg = 6.0 * (1 + 0.25 * wl("sword")) * (if (g.closet.wearing("cape")) 1.25 else 1.0) *
-            (if (g.closet.wearingSet("soldier")) 2.0 else 1.0) * (if (g.closet.wearingSet("hero")) 2.0 else 1.0)
+            (if (g.closet.wearingSet("soldier")) 2.0 else 1.0) * (if (g.closet.wearingSet("hero")) 2.0 else 1.0) * g.space.saberMult()
         return WSoldier(6, false, hp, hp, WAR_WALL_X + 40f, WAR_GROUND - 46f, dmg, sarge = true, reach = 48f)
     }
 

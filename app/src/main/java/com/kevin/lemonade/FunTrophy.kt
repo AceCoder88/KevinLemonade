@@ -25,8 +25,7 @@ val TROPHIES = listOf(
     TrophyDef("Family visit", "Visit the Death Realm") { g, _ -> g.visits >= 1 },
     // INTEGRATION: needs a `kevinGone` flag once the Death/Nightmare Realm core state exists on GameViewModel.
     TrophyDef("Nightmare escapee", "Escape the Nightmare Realm") { _, _ -> false },
-    // INTEGRATION: needs WarState.maxWave (the highest wave reached).
-    TrophyDef("War hero", "Reach wave 10 in war") { _, _ -> false },
+    TrophyDef("War hero", "Reach wave 10 in war") { g, _ -> g.war.maxWave >= 10 },
     TrophyDef("Pirate captain", "Reach voyage 3 as a pirate") { g, _ -> g.pirate.voyage >= 3 },
     TrophyDef("Diamond digger", "Dig up a diamond") { g, _ -> g.dig.dugDiamond },
     TrophyDef("Lucky ticket", "Win the lottery JACKPOT") { _, f -> f.wonJackpot },

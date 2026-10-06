@@ -150,7 +150,8 @@ class WarState(val g: GameViewModel) : Feature {
 
     /** warShop upgrade levels (also read/written by the digging hole for "miners" and "pick") */
     val wl = mutableStateMapOf<String, Int>()
-    fun wl(id: String) = wl[id] ?: 0
+    /** miners and golden pickaxes are bought in the digging hole's shop, so their levels live in DigState */
+    fun wl(id: String) = if (id == "miners" || id == "pick") g.dig.lv(id) else wl[id] ?: 0
 
     var wave by mutableIntStateOf(1)
     /** highest wave ever reached; trophies should read this */
@@ -177,7 +178,7 @@ class WarState(val g: GameViewModel) : Feature {
     fun wallMax(): Float = (20 + 10 * wl("wall") + g.wallBonus).toFloat()
     fun fireGap() = (0.55 * Math.pow(0.82, wl("rate").toDouble())).toFloat()
     fun arrowDmg(): Double = (1 + 0.25 * wl("dmg")) * (if (g.now() < g.stormUntil) 5.0 else 1.0) *
-        (if (g.closet.wearing("cape")) 1.25 else 1.0) * (if (g.closet.wearingSet("hero")) 2.0 else 1.0)
+        (if (g.closet.wearing("cape")) 1.25 else 1.0) * (if (g.closet.wearingSet("hero")) 2.0 else 1.0) * g.space.saberMult()
     fun bondRate(): Long = 2L + wl("value")
     fun bondMult(): Double = (1 + 0.5 * wl("hunter")) * (if (g.now() < g.goldBondsUntil) 3.0 else 1.0)
 
