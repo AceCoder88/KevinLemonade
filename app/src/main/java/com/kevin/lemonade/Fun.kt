@@ -241,6 +241,8 @@ class FunState(val g: GameViewModel) : Feature {
     val gotTrophy = mutableStateListOf<Int>()
     val gotSecret = mutableStateListOf<Int>()
     var usedHall by mutableStateOf(false)
+    /** woke Kevin up while he was asleep at night (the Sleepy head secret trophy) */
+    var wokeKevin by mutableStateOf(false)
     var lemyEver by mutableStateOf(false)
 
     fun checkTrophies() {
@@ -385,7 +387,7 @@ class FunState(val g: GameViewModel) : Feature {
     override fun save(j: JSONObject) {
         j.put("rebirths", rebirths)
         j.put("wonJackpot", wonJackpot)
-        j.put("usedHall", usedHall)
+        j.put("usedHall", usedHall); j.put("wokeKevin", wokeKevin)
         j.put("lemyEver", lemyEver)
         j.put("gotTrophy", JSONArray(gotTrophy))
         j.put("gotSecret", JSONArray(gotSecret))
@@ -398,7 +400,7 @@ class FunState(val g: GameViewModel) : Feature {
     override fun load(j: JSONObject) {
         rebirths = j.optInt("rebirths", 0)
         wonJackpot = j.optBoolean("wonJackpot", false)
-        usedHall = j.optBoolean("usedHall", false)
+        usedHall = j.optBoolean("usedHall", false); wokeKevin = j.optBoolean("wokeKevin", false)
         lemyEver = j.optBoolean("lemyEver", false)
         j.optJSONArray("gotTrophy")?.let { a -> gotTrophy.clear(); for (i in 0 until a.length()) gotTrophy.add(a.getInt(i)) }
         j.optJSONArray("gotSecret")?.let { a -> gotSecret.clear(); for (i in 0 until a.length()) gotSecret.add(a.getInt(i)) }
@@ -412,7 +414,7 @@ class FunState(val g: GameViewModel) : Feature {
     /** a brand new game: wipe everything Fun owns */
     override fun reset() {
         rebirths = 0
-        wonJackpot = false; usedHall = false; lemyEver = false
+        wonJackpot = false; usedHall = false; wokeKevin = false; lemyEver = false
         gotTrophy.clear(); gotSecret.clear()
         for (b in bettors) { b.hired = false; b.t = 0; b.log = "Ready to bet!" }
         lottoCells.clear(); lottoOpen.clear(); hasCard = false; lottoDone = true

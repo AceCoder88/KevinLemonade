@@ -119,6 +119,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     val fun_ = FunState(this)
     val realm = RealmState(this)
     val features: List<Feature> = listOf(closet, dating, travel, war, space, dig, pirate, ride, tower, therapy, fun_, realm)
+    private var puppyPetCd = 0L
+    private val cloudCooldown = LongArray(3)
 
     /** a short message at the bottom of the screen (the original's toast()) */
     var toastText by mutableStateOf<String?>(null)
@@ -132,12 +134,9 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun inRealm(): Boolean = realm.active || realm.nightmare
 
     /** limes: a lemon stand-in that cheers Kevin up instead of making him sad (from Be a Pirate) */
-    var limesLeft by mutableIntStateOf(0)
     /** true while a finger is down on Kevin (so checkGray doesn't turn him evil mid-tap) */
     var holdingKevin by mutableStateOf(false)
     /** which variant of War/Dig is open: "normal", or themed from a Death Realm / Nightmare Realm extra */
-    var warTheme by mutableStateOf("normal")
-    var mineTheme by mutableStateOf("normal")
 
     // ---------------- shared state the original kept at the top of its script ----------------
     // Several features set these (surprise events, codes, the admin panel, the traveling shop, the
@@ -329,7 +328,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         if (busy) return
         if (realm.nightmare) { realm.noEscape(); return }
         if (realm.active) { realm.leaveRealm(); return }
-        val isLime = limesLeft > 0
+        val isLime = pirate.limesLeft > 0
         if (!isLime && lemonsLeft <= 0) {
             say(Lines.outOfLemons.pick())
             catchNudge++
@@ -342,28 +341,32 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun squeezeFlow(byHand: Boolean, isLime: Boolean) {
-        if (isLime) limesLeft--
+        if (isLime) pirate.limesLeft--
         else if (lv("lucky") > 0 && Random.nextDouble() < 0.1 * lv("lucky")) popAt("Lucky! Free lemon", 0.30f, 0.20f)
         else lemonsLeft--
         // the Mega hopper squeezes extra lemons (or limes) at the same time
         var extra = 0; var extraLimes = 0
         repeat(lv("multisq")) {
-            if (limesLeft > 0) { limesLeft--; extra++; extraLimes++ }
+            if (pirate.limesLeft > 0) { pirate.limesLeft--; extra++; extraLimes++ }
             else if (lemonsLeft > 0) { lemonsLeft--; extra++ }
         }
         if (extra > 0) popAt("${extra + 1} lemons at once!", 0.52f, 0.20f)
         // after a rebirth, a second full-size squeezer squeezes another lemon (or lime) at the same time
         var twinLime = false; var twin = false
         if (fun_.rebirths >= 1) {
-            if (limesLeft > 0) { limesLeft--; twin = true; twinLime = true }
+            if (pirate.limesLeft > 0) { pirate.limesLeft--; twin = true; twinLime = true }
             else if (lemonsLeft > 0) { lemonsLeft--; twin = true }
             if (twin) popAt("Extra squeeze!", 0.46f, 0.22f)
         }
 
         look = Offset(420f, 60f)
         nextRelative()
-        val golden = (lv("golden") > 0 && Random.nextDouble() < 0.05 * lv("golden")) ||
+        val star = closet.wearing("starglasses")
+        val golden = goldenNext > 0 ||
+                ((lv("golden") > 0 || star) && Random.nextDouble() < 0.05 * lv("golden") + (if (star) 0.06 else 0.0)) ||
+                (closet.wearingSet("wizard") && Random.nextDouble() < 0.05) ||
                 (lv("goldluck") > 0 && Random.nextDouble() < 0.03 * lv("goldluck"))
+        if (goldenNext > 0) goldenNext--
         val diamond = !golden && !isLime && lv("diamondluck") > 0 && Random.nextDouble() < 0.015 * lv("diamondluck")
         dropColor = if (golden) Color(0xFFFFC400) else if (diamond) Color(0xFFA8EEFF) else if (isLime) Color(0xFF7BC043) else PEEL
         dropGlow = if (golden) Color(0xFFFFE066) else if (diamond) Color(0xFFDFF8FF) else null
@@ -495,8 +498,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         var p = earn()
         if (Random.nextDouble() < 0.06 * lv("vip") + 0.04 * lv("vipluck")) { p *= 5; popAt("VIP customer! x5", 0.6f, 0.3f) }
         money += p
-        if (Random.nextDouble() < 0.12 * lv("tips") + 0.06 * lv("tipluck")) {
-            val tip = max(1L, Math.round(p * 1.5))
+        if (Random.nextDouble() < 0.12 * lv("tips") + (if (closet.wearing("monocle")) 0.15 else 0.0) + 0.06 * lv("tipluck")) {
+            val tip = max(1L, Math.round(p * 1.5 * (if (closet.wearing("fancyshoes")) 2 else 1)))
             money += tip
             viewModelScope.launch { delay(350); popAt("+${fmt(tip)} tip!", 0.82f, 0.5f) }
         }
@@ -558,6 +561,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun kevinDown() {
         if (sleeping) {
             sleeping = false; idleAnimT = 0; showFace(Face.HAPPY)
+            fun_.wokeKevin = true; fun_.checkTrophies()
             say(listOf("Huh?! I'm awake! I wasn't sleeping!", "*yawn* Five more minutes...", "I was just resting my eyes!").pick())
             return
         }
@@ -614,13 +618,13 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         if (u.id == "press") Upgrades.pressDesc.getOrElse(lv("press")) { "The best squeezer there is" } else named(u.desc)
 
     fun buy(u: Upgrade) {
-        val c = u.cost(lv(u.id))
+        val c = u.cost(lv(u.id), closet.mustacheDiscount())
         if (money < c || lv(u.id) >= u.max) return
         money -= c
         lvl[u.id] = lv(u.id) + 1
         say(u.say)
         if (u.id == "therapy") showFace(Face.HAPPY)
-        if (u.id == "girlfriend" && !realm.kevinGone && !realm.nightmare) dating.momoWith = true
+        if (u.id == "girlfriend" && !realm.kevinGone && !realm.nightmare) dating.getGirlfriend()
         zestSays = Lines.zestBuy.pick()
         save()
     }
@@ -644,7 +648,6 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun pokeZest() { zestSays = Lines.zestPoke.pick() }
 
     // ---------------- the puppy, and clouds that rain lemons ----------------
-    private var puppyPetCd = 0L
     fun petPuppy() {
         if (now() < puppyPetCd) return
         puppyPetCd = now() + 2500
@@ -656,7 +659,6 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         ).pick())
     }
 
-    private val cloudCooldown = LongArray(3)
     fun rainCloud(index: Int) {
         if (realm.active || realm.nightmare || index !in cloudCooldown.indices || now() < cloudCooldown[index]) return
         cloudCooldown[index] = now() + 20000
@@ -682,17 +684,17 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             if (inAnotherWorld()) { lastAuto += 100 }
             else {
                 if (lv("auto") > 0 && !busy && holdStart == 0L && !realm.active && !realm.nightmare &&
-                    (lemonsLeft > 0 || limesLeft > 0) && now - lastAuto >= autoEvery()
+                    (lemonsLeft > 0 || pirate.limesLeft > 0) && now - lastAuto >= autoEvery()
                 ) { lastAuto = now; squeeze(false) }
                 // the Extra squeezer upgrade: 1-3 little squeezers that work all by themselves
                 if (lv("squeezers") > 0 && !realm.active && !realm.nightmare) {
                     for (i in 0 until lv("squeezers")) {
                         squeezerT[i] += 0.1
                         if (squeezerT[i] < 5.5 / speed()) continue
-                        if (limesLeft <= 0 && lemonsLeft <= 0) continue
+                        if (pirate.limesLeft <= 0 && lemonsLeft <= 0) continue
                         squeezerT[i] = 0.0
-                        val miniLime = limesLeft > 0
-                        if (miniLime) limesLeft-- else lemonsLeft--
+                        val miniLime = pirate.limesLeft > 0
+                        if (miniLime) pirate.limesLeft-- else lemonsLeft--
                         if (miniLime) sad = max(0.0, sad - 0.5) else sad = min(doom(), sad + 0.5)
                         addJuice(1 + lv("press"))
                     }
@@ -765,7 +767,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         val j = JSONObject()
         j.put("name", name); j.put("money", money); j.put("lemonsLeft", lemonsLeft); j.put("glasses", glasses)
         j.put("sad", sad); j.put("inPitcher", inPitcher)
-        j.put("visits", visits); j.put("limesLeft", limesLeft); j.put("gender", gender)
+        j.put("visits", visits); j.put("gender", gender)
         j.put("cute", cute); j.put("og", og)
         j.put("talk", JSONObject(talk.toMap()))
         j.put("lvl", JSONObject(lvl.toMap())); j.put("lemonLvl", JSONObject(lemonLvl.toMap()))
@@ -780,7 +782,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             name = j.optString("name", "Kevin")
             money = j.optLong("money", 0); lemonsLeft = j.optInt("lemonsLeft", 20); glasses = j.optInt("glasses", 0)
             sad = j.optDouble("sad", 0.0); inPitcher = j.optInt("inPitcher", 0)
-            visits = j.optInt("visits", 0); limesLeft = j.optInt("limesLeft", 0); gender = j.optString("gender", "boy")
+            visits = j.optInt("visits", 0); gender = j.optString("gender", "boy")
             cute = j.optBoolean("cute", false); og = j.optBoolean("og", false)
             j.optJSONObject("talk")?.let { o -> o.keys().forEach { talk[it] = o.optBoolean(it, true) } }
             j.optJSONObject("lvl")?.let { o -> o.keys().forEach { lvl[it] = o.getInt(it) } }
@@ -792,7 +794,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     fun restart() {
         name = "Kevin"; money = 0; lemonsLeft = 20; glasses = 0; sad = 0.0; inPitcher = 0
-        visits = 0; limesLeft = 0; warTheme = "normal"; mineTheme = "normal"; bypassLocks = false
+        visits = 0; bypassLocks = false
         lvl.clear(); lemonLvl.clear(); juiceLevel = 0f; partyUntil = 0
         for (f in features) f.reset()
         showFace(Face.HAPPY)

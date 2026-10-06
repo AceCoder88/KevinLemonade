@@ -169,14 +169,6 @@ private val setLines = mapOf(
     "wizard" to "You shall not SQUEEZE! ...Okay, you can squeeze a little.",
 )
 
-/** the Death Realm's "Dead Closet": spooky costumes, only while visiting (the original's DEAD) */
-data class DeadCostume(val id: String, val name: String, val price: Long, val line: String)
-val DEAD_COSTUMES = listOf(
-    DeadCostume("sheet", "Bedsheet ghost", 40L, "Boooo! I'm a ghost wearing a ghost costume. Ghost-ception!"),
-    DeadCostume("skeleton", "Skeleton suit", 40L, "Look at my bones! ...Lemons don't have bones. Look at my FAKE bones!"),
-    DeadCostume("vampire", "Vampire cape", 40L, "I vant to drink your... lemonade. Bleh!"),
-)
-
 /** Kevin's Closet: outfits with special powers. */
 class ClosetState(val g: GameViewModel) : Feature {
     override val key = "closet"
@@ -184,14 +176,6 @@ class ClosetState(val g: GameViewModel) : Feature {
     val owned = mutableStateListOf<String>()
     val equipped = mutableStateMapOf("hat" to null as String?, "face" to null as String?, "body" to null as String?, "feet" to null as String?, "back" to null as String?)
 
-    /** The Death Realm's separate "Dead Closet". A public mode flag: whoever adds the
-     * Death Realm's "Dead Closet" button sets `g.closet.deadMode = true; g.screen = Screen.CLOSET`
-     * (it should only be reachable while [GameViewModel.inRealm] is true, like the original's
-     * `deadClosetGo` button, which only shows up while `realm`). Setting it false (or just
-     * navigating back to Screen.STAND) leaves the Dead Closet. */
-    var deadMode by mutableStateOf(false)
-    val deadOwned = mutableStateListOf<String>()
-    var deadWearing by mutableStateOf<String?>(null)
 
     private var crownT = 0
     private var pirateT = 0
@@ -204,8 +188,6 @@ class ClosetState(val g: GameViewModel) : Feature {
     fun wearingSet(key: String): Boolean = SET_BY_KEY[key]?.pieces?.all { wearing(it) } == true
     /** Mr. Zest's mustache discount: 30% off wearing the whole Mustache Guy set, 10% off just the mustache */
     fun mustacheDiscount(): Double = if (wearingSet("mustache")) 0.7 else if (wearing("mustache")) 0.9 else 1.0
-    /** while wearing a Dead Closet costume, squeezing a ghost in the Death Realm pays 50% more */
-    fun deadGhostBonus(): Double = if (deadWearing != null) 1.5 else 1.0
 
     /** buy (if not owned) and toggle wearing one piece */
     fun buyOrWear(c: ClothItem) {
@@ -240,17 +222,6 @@ class ClosetState(val g: GameViewModel) : Feature {
         g.save()
     }
 
-    fun buyOrWearDead(id: String) {
-        val d = DEAD_COSTUMES.find { it.id == id } ?: return
-        if (!deadOwned.contains(id)) {
-            if (g.money < d.price) return
-            g.money -= d.price
-            deadOwned.add(id)
-        }
-        deadWearing = if (deadWearing == id) null else id
-        if (deadWearing == id) g.say(d.line)
-        g.save()
-    }
 
     override fun tick() {
         if (wearing("slippers") && g.sad > 0) g.sad = maxOf(0.0, g.sad - 0.12)
@@ -278,22 +249,17 @@ class ClosetState(val g: GameViewModel) : Feature {
         j.put("owned", JSONArray(owned.toList()))
         val eq = JSONObject(); for ((slot, id) in equipped) if (id != null) eq.put(slot, id)
         j.put("equipped", eq)
-        j.put("deadOwned", JSONArray(deadOwned.toList()))
-        deadWearing?.let { j.put("deadWearing", it) }
     }
 
     override fun load(j: JSONObject) {
         owned.clear(); owned.addAll(j.optJSONArray("owned")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList())
         for (slot in equipped.keys.toList()) equipped[slot] = null
         j.optJSONObject("equipped")?.let { eq -> eq.keys().forEach { slot -> equipped[slot] = eq.getString(slot) } }
-        deadOwned.clear(); deadOwned.addAll(j.optJSONArray("deadOwned")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList())
-        deadWearing = if (j.has("deadWearing")) j.optString("deadWearing") else null
     }
 
     override fun reset() {
         owned.clear()
         for (slot in equipped.keys.toList()) equipped[slot] = null
-        deadOwned.clear(); deadWearing = null; deadMode = false
     }
 
     /** Rebirth doesn't touch the closet in the original - outfits are kept. */
@@ -307,7 +273,6 @@ class ClosetState(val g: GameViewModel) : Feature {
 // ======================= Kevin's Closet screen =======================
 @Composable
 fun ClosetScreen(g: GameViewModel) {
-    if (g.closet.deadMode) { DeadClosetScreen(g); return }
     val c = g.closet
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -390,25 +355,3 @@ private fun ClosetTile(name: String, effect: String, status: String, on: Boolean
     }
 }
 
-// ======================= the Dead Closet (Death Realm only) =======================
-@Composable
-private fun DeadClosetScreen(g: GameViewModel) {
-    val c = g.closet
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp)) {
-        ChunkyButton("Back to lemonade", color = CARD) { c.deadMode = false; g.screen = Screen.STAND }
-        Spacer(Modifier.height(20.dp))
-        OutlinedTitle("The Dead Closet", 26, Color(0xFF9FE8FF))
-        Text("Spooky costumes for ghost ${g.name}. He can only wear them in the Death Realm. While he wears one, squeezing ghosts pays 50% more!",
-            fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(10.dp))
-        for (d in DEAD_COSTUMES) {
-            val have = c.deadOwned.contains(d.id)
-            val on = c.deadWearing == d.id
-            val status = if (on) "Wearing it! Tap to take off" else if (have) "Tap to wear" else "Buy for ${fmt(d.price)}"
-            ClosetTile(d.name, "Only in the Death Realm. Ghost squeezes pay 50% more.", status, on, enabled = on || have || g.money >= d.price) {
-                c.buyOrWearDead(d.id)
-            }
-        }
-        Spacer(Modifier.height(30.dp))
-    }
-}

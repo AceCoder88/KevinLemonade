@@ -192,7 +192,7 @@ fun StandScreen(g: GameViewModel) {
                 g.cranking -> "Crank! (${g.crankN}/${g.crankNeed})"
                 r.nightmare -> r.escapeButtonLabel()
                 r.active -> "Escape the death realm"
-                g.limesLeft > 0 -> "Squeeze a lime (${g.limesLeft} left)"
+                g.pirate.limesLeft > 0 -> "Squeeze a lime (${g.pirate.limesLeft} left)"
                 else -> "Squeeze a lemon"
             },
             big = true,
@@ -201,7 +201,7 @@ fun StandScreen(g: GameViewModel) {
         ) { g.mainButton() }
         Spacer(Modifier.height(6.dp))
         if (!r.active && !r.nightmare) {
-            val out = g.lemonsLeft <= 0 && g.limesLeft <= 0
+            val out = g.lemonsLeft <= 0 && g.pirate.limesLeft <= 0
             Text(if (out) "Out of lemons! Go catch more below." else "Lemons: ${g.lemonsLeft} / ${g.lemonCap()}",
                 color = if (out) RED else LINE, fontWeight = FontWeight.Black, fontSize = 17.sp)
             Text("Pitchers sold: ${g.glasses}", fontSize = 15.sp)
@@ -222,16 +222,16 @@ fun StandScreen(g: GameViewModel) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (r.active) {
                     ChunkyButton("Death War", color = Color(0xFF6A4BE8), textColor = Color.White) {
-                        g.warTheme = "death"; g.screen = Screen.WAR
+                        g.war.enterDeathWar()
                     }
                     ChunkyButton("Dead Closet", color = Color(0xFF6A4BE8), textColor = Color.White) { showDeadCloset = true }
                 }
                 if (r.nightmare) {
                     ChunkyButton("Broken War", color = Color(0xFF6A4BE8), textColor = Color.White) {
-                        g.warTheme = "broken"; g.screen = Screen.WAR
+                        g.war.enterBrokenWar()
                     }
                     ChunkyButton("Horrible Hole", color = Color(0xFF6A4BE8), textColor = Color.White) {
-                        g.mineTheme = "horrible"; g.screen = Screen.DIG
+                        g.dig.theme = DigTheme.HORRIBLE; g.screen = Screen.DIG
                     }
                 }
             }
@@ -361,7 +361,7 @@ fun Stage(g: GameViewModel) {
                             if (g.lv("telescope") > 0 || g.bypassLocks) g.screen = Screen.SPACE
                             else g.toast("You need a telescope to go to space! Buy one in the Shop under Tools.")
                         }
-                        !g.realm.active && !g.realm.nightmare && g.lv("shovel") > 0 && onDigHole(p) -> g.screen = Screen.DIG
+                        !g.realm.active && !g.realm.nightmare && g.lv("shovel") > 0 && onDigHole(p) -> { g.dig.theme = DigTheme.NORMAL; g.screen = Screen.DIG }
                         !g.realm.active && !g.realm.nightmare && g.dating.momoWith && onMomo(p) -> g.screen = Screen.DATE
                         !g.realm.active && !g.realm.nightmare && g.lv("puppy") > 0 && onPuppy(p) -> g.petPuppy()
                         !g.realm.active && !g.realm.nightmare && !g.og && cloudIndexAt(p, time) >= 0 -> g.rainCloud(cloudIndexAt(p, time))

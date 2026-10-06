@@ -102,7 +102,7 @@ class PirateState(val g: GameViewModel) : Feature {
     /** the original's kevinAboard() = wearingSet('pirate') && !kevinGone. There's no kevinGone
      * flag ported yet (Kevin being away doing something else); add `&& !g.kevinGone` here once
      * one exists. */
-    fun kevinAboard() = g.closet.wearingSet("pirate")
+    fun kevinAboard() = g.closet.wearingSet("pirate") && !g.realm.kevinGone
 
     var shipX by mutableFloatStateOf(140f)
     var shipY by mutableFloatStateOf(250f)

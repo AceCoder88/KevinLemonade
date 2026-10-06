@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.PathParser
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
@@ -193,7 +194,7 @@ fun DrawScope.drawStage(g: GameViewModel, timeMs: Long) {
     stroke("M500 298 L620 298", w = 5f)
     stroke("M522 318 L526 380", Color.White.copy(alpha = 0.7f), 5f)
 
-    if (!g.realm.nightmare && !g.realm.kevinGone) drawKevin(g, if (g.realm.active) 0.75f else 1f)
+    if (!g.realm.nightmare && !g.realm.kevinGone) drawKevinWithPotions(g, timeMs, if (g.realm.active) 0.75f else 1f)
 
     // the "don't hold me" ring
     if (g.holdProgress > 0f) {
@@ -221,14 +222,42 @@ private fun DrawScope.withAlpha(alpha: Float, block: DrawScope.() -> Unit) {
     }
 }
 
-private fun DrawScope.drawKevin(g: GameViewModel, alpha: Float = 1f) = withAlpha(alpha) {
+private val RAINBOW = listOf(0xFFFF5A5A, 0xFFFF9A3C, 0xFFFFE14A, 0xFF5CD65C, 0xFF4AA8FF, 0xFFA06BFF, 0xFFFF5A5A).map { Color(it) }
+private fun rainbowAt(t: Float): Color {
+    val seg = (t - floor(t)) * (RAINBOW.size - 1)
+    val i = seg.toInt().coerceAtMost(RAINBOW.size - 2)
+    return lerp(RAINBOW[i], RAINBOW[i + 1], seg - i)
+}
+
+/** Kevin plus the Wizard Tower's potions: giant/shrinking, invisible, bubble, rainbow, heart eyes */
+private fun DrawScope.drawKevinWithPotions(g: GameViewModel, timeMs: Long, alpha: Float) {
+    val now = g.now()
+    val t = g.tower
+    val k = t.kevinScale()
+    val bubble = now < t.bubbleUntil
+    val lift = if (bubble) -40f + 8f * sin(timeMs / 400f) else 0f
+    val a = alpha * (if (now < t.invisibleUntil) 0.12f else 1f)
+    translate(0f, lift) {
+        scale(k, k, Offset(170f, 458f)) {
+            drawKevin(g, a, if (now < t.rainbowKevinUntil) timeMs / 2400f else null, now < t.heartEyesUntil)
+            if (bubble) {
+                drawCircle(Color(0xFFBFE9FF).copy(alpha = 0.25f), 150f, Offset(170f, 320f))
+                drawCircle(Color.White.copy(alpha = 0.8f), 150f, Offset(170f, 320f), style = Stroke(4f))
+                stroke("M90 230 C 100 205 120 190 140 185", Color.White.copy(alpha = 0.9f), 6f)
+            }
+        }
+    }
+}
+
+private fun DrawScope.drawKevin(g: GameViewModel, alpha: Float = 1f, rainbow: Float? = null, heartEyes: Boolean = false) = withAlpha(alpha) {
     val s = g.sadFrac().toFloat()
-    val peel = lerp(Color(0xFFFFD21F), Color(0xFFB9B5A0), s)
-    val leaf = lerp(Color(0xFF3E9B4F), Color(0xFF7C7F6E), s)
+    val peel = rainbow?.let { rainbowAt(it) } ?: lerp(Color(0xFFFFD21F), Color(0xFFB9B5A0), s)
+    val leaf = rainbow?.let { rainbowAt(1f - it) } ?: lerp(Color(0xFF3E9B4F), Color(0xFF7C7F6E), s)
 
     oval(170f, 458f, 78f, 10f, Color.Black, null, alpha = 0.16f)
     stroke("M148 398 L142 448", w = 5f); stroke("M192 398 L198 448", w = 5f)
     oval(136f, 452f, 18f, 9f, RED); oval(204f, 452f, 18f, 9f, RED)
+    drawOutfit(g.closet, "feet")
 
     val droop = if (g.sleeping) 6f else if (g.sleepy) 3f else 0f
     translate(g.kevinDx, g.kevinDy) {
@@ -238,6 +267,7 @@ private fun DrawScope.drawKevin(g: GameViewModel, alpha: Float = 1f) = withAlpha
             oval(170f, 190f, 13f, 10f, peel)
             oval(170f, 400f, 13f, 10f, peel)
             shape("M174 186 C 190 158 226 158 236 172 C 216 188 192 190 174 186 Z", leaf)
+            drawOutfit(g.closet, "back")
             oval(170f, 295f, 95f, 106f, peel, w = 5f)
             drawOval(fruitShade(170f, 295f, 92f, 103f), Offset(78f, 192f), Size(184f, 206f))
             for ((x, y, r) in listOf(Triple(110f, 330f, 2.5f), Triple(125f, 360f, 2f), Triple(215f, 350f, 2.5f), Triple(235f, 300f, 2f), Triple(200f, 375f, 2f), Triple(140f, 385f, 2f)))
@@ -278,6 +308,10 @@ private fun DrawScope.drawKevin(g: GameViewModel, alpha: Float = 1f) = withAlpha
                 Face.WORRY -> stroke("M146 344 Q170 326 194 344", w = 5f)
                 Face.GASP -> oval(170f, 338f, 12f, 16f, Color(0xFF8C2F2F))
             }
+            if (heartEyes) for (c in listOf(Offset(142f, 276f), Offset(198f, 276f)))
+                shape("M${c.x} ${c.y + 14} C ${c.x - 26} ${c.y - 4} ${c.x - 12} ${c.y - 22} ${c.x} ${c.y - 8} " +
+                    "C ${c.x + 12} ${c.y - 22} ${c.x + 26} ${c.y - 4} ${c.x} ${c.y + 14} Z", Color(0xFFFF4D8D), w = 3f)
+            drawOutfit(g.closet, "top")
         }
     }
     if (g.sleeping) drawZzz(Offset(235f, 190f))

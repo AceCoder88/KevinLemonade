@@ -36,9 +36,9 @@ fun Hub(g: GameViewModel) {
         )
         HubTab.WORLDS -> listOf(
             Place("🍋 Catch the Lemons", Color(0xFFE8B90F), LINE, show = true) { g.screen = Screen.CATCH },
-            Place("⚔️ Go to War", Color(0xFF6B7A3A), show = (g.lv("bow") > 0 || g.bypassLocks)) { g.screen = Screen.WAR },
+            Place("⚔️ Go to War", Color(0xFF6B7A3A), show = (g.lv("bow") > 0 || g.bypassLocks)) { g.war.enterNormalWar() },
             Place("🚀 Space", Color(0xFF141A3A), PEEL, show = (g.lv("telescope") > 0 || g.bypassLocks) && !realm) { g.screen = Screen.SPACE },
-            Place("⛏️ Dig", Color(0xFF6B4A1E), Color(0xFFFFF6E0), show = g.lv("shovel") > 0 && !realm) { g.screen = Screen.DIG },
+            Place("⛏️ Dig", Color(0xFF6B4A1E), Color(0xFFFFF6E0), show = g.lv("shovel") > 0 && !realm) { g.dig.theme = DigTheme.NORMAL; g.screen = Screen.DIG },
             Place("🏴‍☠️ Be a Pirate", Color(0xFF1E4E6E), PEEL, show = (g.lv("map") > 0 || g.bypassLocks) && !realm) { g.screen = Screen.PIRATE },
             Place("🐎 Ride the Horse", Color(0xFF8B5A2B), show = g.lv("saddle") > 0 || g.closet.wearingSet("cowboy")) { g.screen = Screen.RIDE },
             Place("🧙 Wizard Tower", Color(0xFF4B2E9E),
