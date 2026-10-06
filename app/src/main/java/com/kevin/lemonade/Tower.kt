@@ -68,10 +68,9 @@ private val SPELLS = listOf(
         t.g.war.bonds += 150
         "BONDUS BLIZZARDUS! War bonds everywhere!"
     },
-    // NOTE: the original also adds 15 to a global `limesLeft` counter here (squeezing limes instead of
-    // lemons makes {N} happy). That mechanic isn't ported into GameViewModel yet, so this spell currently
-    // only costs mana and shows the line - see Tower.kt's integration notes.
-    Spell("limes", "Summon Limes", 45, "15 limes appear (squeezing limes makes {N} happy)") { _ ->
+    // the original adds 15 limes with no cap here (the pirate hold's cap only limits what ships bring back)
+    Spell("limes", "Summon Limes", 45, "15 limes appear (squeezing limes makes {N} happy)") { t ->
+        t.g.pirate.limesLeft += 15
         "LIMUS APPEARUS! Fresh limes to squeeze!"
     },
     Spell("freeze", "Freeze Sadness", 55, "{N} can't get sad for 3 minutes") { t ->
