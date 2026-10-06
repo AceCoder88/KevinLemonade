@@ -205,9 +205,7 @@ class SpaceSim(val g: GameViewModel, val scope: CoroutineScope, val onLeave: () 
                 val c = chests.removeAt(idx)
                 val loot = listOf<() -> String>(
                     { val v = max(150L, g.price() * 12); g.money += v; "+${fmt(v)}!" },
-                    // TODO(integration): the original grants +12 limes here (Pirate's currency). PirateState
-                    // doesn't expose a lime counter yet - wire this to it once Pirate.kt is ported.
-                    { "+12 limes!" },
+                    { g.pirate.limesLeft += 12; "+12 limes!" },
                     { g.war.bonds += 80; "+80 war bonds!" },
                     { g.addLemons(25); "+25 lemons!" },
                     { g.goldenNext += 3; "3 golden lemons!" },
@@ -232,8 +230,7 @@ class SpaceSim(val g: GameViewModel, val scope: CoroutineScope, val onLeave: () 
                 val r = Random.nextDouble()
                 when {
                     r < 0.3 -> { val v = max(500L, g.price() * 40); g.money += v; sPop("The black hole spit out +${fmt(v)}!", BLACKHOLE_X + 60, BLACKHOLE_Y - 50); kSay("It spit out MONEY! Thanks, black hole!") }
-                    // TODO(integration): the original grants +30 limes here too - see the chest TODO above.
-                    r < 0.5 -> { sPop("30 limes came out!", BLACKHOLE_X + 60, BLACKHOLE_Y - 50); kSay("Limes from another dimension!") }
+                    r < 0.5 -> { g.pirate.limesLeft += 30; sPop("30 limes came out!", BLACKHOLE_X + 60, BLACKHOLE_Y - 50); kSay("Limes from another dimension!") }
                     r < 0.7 -> { g.war.bonds += 200; sPop("+200 war bonds!", BLACKHOLE_X + 60, BLACKHOLE_Y - 50); kSay("War bonds from the void!") }
                     r < 0.9 -> { sPop("Kevin got stretched like spaghetti!", BLACKHOLE_X + 80, BLACKHOLE_Y - 50); kSay("I'm SPAGHETTI! I'm lemon spaghetti! ...Okay, I'm back. That was weird.") }
                     else -> { val v = (g.money * 0.05).toLong(); g.money -= v; sPop("It ate ${fmt(v)}! Burp.", BLACKHOLE_X + 60, BLACKHOLE_Y - 50); kSay("It ATE some of our money! Bad black hole!") }

@@ -68,9 +68,6 @@ class FunState(val g: GameViewModel) : Feature {
     var lottoMsg by mutableStateOf("Buy a ticket and scratch it!")
     var wonJackpot by mutableStateOf(false)
 
-    /** limes won from the lottery/bettors. INTEGRATION: this should feed Pirate's limesLeft (squeezable limes)
-     * once PirateState exists; for now it's just held here so nothing crashes or silently vanishes. */
-    var strandedLimes by mutableIntStateOf(0)
 
     private fun rollSymbol(): LottoSymbol {
         var r = Random.nextDouble() * 100
@@ -125,7 +122,7 @@ class FunState(val g: GameViewModel) : Feature {
         lottoMsg = when {
             win == null -> "No match. ${g.name}: \"Aww. Maybe next time!\""
             win.id == "skull" -> "3 skulls! Darth Lime laughs at you. Nothing this time!"
-            win.limes > 0 -> { strandedLimes += win.limes; "3 limes! You win ${win.limes} limes to squeeze!" }
+            win.limes > 0 -> { g.pirate.limesLeft += win.limes; "3 limes! You win ${win.limes} limes to squeeze!" }
             else -> {
                 g.money += win.prize
                 if (win.id == "kevin") wonJackpot = true
@@ -200,7 +197,7 @@ class FunState(val g: GameViewModel) : Feature {
         val r = Random.nextDouble() * 100
         val id = when { r < 33 -> "lemon"; r < 52 -> "lime"; r < 77 -> "gold"; r < 88 -> "diamond"; r < 92 -> "kevin"; else -> "skull" }
         val s = SYMBOLS.first { it.id == id }
-        if (s.limes > 0) { strandedLimes += s.limes; return "won ${s.limes} limes" to 0L }
+        if (s.limes > 0) { g.pirate.limesLeft += s.limes; return "won ${s.limes} limes" to 0L }
         if (s.id == "kevin") wonJackpot = true
         return (if (s.prize > 0) "won ${fmt(s.prize)}" else "got 3 skulls") to s.prize
     }
@@ -318,7 +315,7 @@ class FunState(val g: GameViewModel) : Feature {
     private fun eventBirthday() {
         val gift = max(300L, g.price() * 30)
         g.money += gift
-        strandedLimes += 10
+        g.pirate.limesLeft += 10
         g.popAt("HAPPY BIRTHDAY, ${g.name.uppercase()}! Presents: +${fmt(gift)} and 10 limes!", 0.5f, 0.12f)
         g.sad = 0.0
         g.showFace(Face.CHEER)
@@ -420,7 +417,6 @@ class FunState(val g: GameViewModel) : Feature {
         for (b in bettors) { b.hired = false; b.t = 0; b.log = "Ready to bet!" }
         lottoCells.clear(); lottoOpen.clear(); hasCard = false; lottoDone = true
         lottoMsg = "Buy a ticket and scratch it!"
-        strandedLimes = 0
         racing = false; raceMsg = ""; for (i in racePos.indices) racePos[i] = 0f
         custQueue = 0
         g.cute = false; g.og = false; g.gender = "boy"
