@@ -11,6 +11,8 @@ enum class Cat(val title: String, val note: String) {
     LEMONS("Lemons", "Get more lemons without catching them"),
     HAPPY("Kevin's happiness", "Keep Kevin smiling"),
     ADVANCED("Advanced upgrades", "Big, pricey, powerful"),
+    THERAPY("Therapy", "Dr. Rind's best stuff, and maybe even love"),
+    SPOOKY("Spooky upgrades", "Only sold in the Death Realm. They help in the Death Realm and the Nightmare Realm."),
 }
 
 /** {N} in a name/desc becomes Kevin's name. Numbers match the original game exactly. */
@@ -86,6 +88,34 @@ object Upgrades {
         Upgrade("fanclub", Cat.ADVANCED, "{N}'s fan club", "While {N} is happy, fans pay you money every few seconds", 600.0, 2.2, 5, "I have FANS?! Hi fans! Please don't squeeze me!"),
         Upgrade("golden", Cat.ADVANCED, "Golden lemons", "Sometimes a golden lemon falls in. Worth 10 pitchers!", 250.0, 2.5, 5, "Golden cousins? Does my family have... RICH relatives?"),
         Upgrade("franchise", Cat.ADVANCED, "Lemonade franchise", "Open another stand in town: +50% money", 500.0, 3.0, 5, "There's ANOTHER stand?! Is there another ME?!"),
+        Upgrade("thappy", Cat.THERAPY, "Longer happiness", "After therapy, {N} stays happy 30 seconds longer", 60.0, 1.8, 6, "More happy time?! I'll take ALL the happy time!"),
+        Upgrade("tquick", Cat.THERAPY, "Quick sessions", "Therapy takes 8 seconds less, so {N} comes back sooner", 50.0, 1.8, 5, "Shorter sessions! Dr. Rind talks fast now."),
+        Upgrade("lottopass", Cat.TOOLS, "A lottery booth", "Unlocks the LEMON LOTTERY: scratch cards with big prizes", 50.0, 1.0, 1, "A lottery booth! I feel lucky!"),
+        Upgrade("racepass", Cat.TOOLS, "A race track", "Unlocks the LEMON RACES: bet on the fastest lemon", 75.0, 1.0, 1, "A race track! Go, little lemons, GO!"),
+        Upgrade("clover", Cat.LUCK, "Four-leaf clover", "+4% luck: lottery tickets win more and your race lemon runs faster", 60.0, 1.9, 5, "A four-leaf clover! I'm feeling lucky!"),
+        Upgrade("horseshoe", Cat.LUCK, "Lucky horseshoe", "+4% luck: lottery tickets win more and your race lemon runs faster", 90.0, 1.9, 5, "A lucky horseshoe! Where's the horse? Oh wait, the horse is fine."),
+        Upgrade("dodgeluck", Cat.LUCK, "Lucky dodge", "Sometimes an attack does NO damage: your wall, soldiers, miners, and pirate ships get lucky", 200.0, 2.0, 5, "Lucky dodge! The bugs keep missing! Ha!"),
+        Upgrade("critluck", Cat.LUCK, "Lucky arrows", "Critical hits in war (triple damage) happen more often", 160.0, 1.9, 5, "Lucky arrows! Bullseye every time!"),
+        Upgrade("oreluck", Cat.LUCK, "Lucky dirt", "More ores when you dig a new spot", 120.0, 1.9, 5, "Lucky dirt! Shiny stuff everywhere down there!"),
+        Upgrade("rabbitfoot", Cat.LUCK, "Lucky rabbit's foot", "+4% luck (a fake one, no rabbits were hurt!)", 120.0, 1.9, 5, "Don't worry, it's a FAKE rabbit's foot. It's made of fluff!"),
+        Upgrade("wand", Cat.TOOLS, "A magic wand", "Unlocks the WIZARD TOWER: cast spells and brew potions", 120.0, 1.0, 1, "A magic wand! Abra-ca-LEMON-bra!"),
+        Upgrade("saddle", Cat.TOOLS, "A saddle", "Unlocks the HORSE RIDE: gallop across the Wild West", 100.0, 1.0, 1, "A saddle! Giddy-up! ...Wait, where's the horse? Oh, there it is!"),
+        Upgrade("bow", Cat.TOOLS, "A bow and arrows", "Unlocks WAR: defend the wall from bugs, rats and bosses", 40.0, 1.0, 1, "A bow?! I'm gonna be a lemon archer! Pew pew!"),
+        Upgrade("pager", Cat.TOOLS, "Dr. Rind's pager", "Unlocks THERAPY: page Dr. Rind whenever Kevin needs to talk", 30.0, 1.0, 1, "Dr. Rind's pager! Now I can call him whenever I'm sad."),
+        Upgrade("telescope", Cat.TOOLS, "A telescope", "Unlocks SPACE: tap the sun to fly to the planets", 100.0, 1.0, 1, "A telescope! Whoa, I can see Mars! And a STRAWBERRY?!"),
+        Upgrade("map", Cat.TOOLS, "A treasure map", "Unlocks being a PIRATE: the pirate ship in the war will take you sailing", 150.0, 1.0, 1, "A treasure map! X marks the... limes?"),
+        Upgrade("closetkey", Cat.TOOLS, "A closet key", "Unlocks KEVIN'S CLOSET: outfits with special powers", 30.0, 1.0, 1, "The key to my closet! Time to get FABULOUS."),
+        Upgrade("shovel", Cat.TOOLS, "A shovel", "Unlocks DIGGING: a hole appears next to the stand. Dig for ores to sell!", 200.0, 1.0, 1, "A shovel! I'm gonna dig to the center of the Earth! ...Wait, what's down there?"),
+        Upgrade("girlfriend", Cat.THERAPY, "A girlfriend: Lemy", "{N} gets a girlfriend named Lemy, a lemon with a pink bow. She stays by his side and he makes DOUBLE money", 100.0, 1.0, 1, "Lemy?! She's... PERFECT. My heart is going boing-boing!"),
+        Upgrade("tchair", Cat.THERAPY, "Therapy on the go", "{N} gets a therapy chair at the stand. Dr. Rind calls him and slowly cheers him up", 150.0, 2.0, 3, "A therapy chair! And Dr. Rind is on speakerphone! Hi, Dr. Rind!"),
+        Upgrade("squeezers", Cat.ADVANCED, "Extra squeezer", "Another squeezer that squeezes lemons all by itself (uses lemons)", 150.0, 3.0, 3, "MORE squeezers?! How many squeezers does one stand NEED?!"),
+        Upgrade("ghostpay", Cat.SPOOKY, "Ghost juicer", "Squeezing a ghost in the Death Realm pays \$25 more", 60.0, 2.0, 5, "A machine JUST for squeezing ghosts?! That's... specific."),
+        Upgrade("pass", Cat.SPOOKY, "Death Realm pass", "Visiting the Death Realm costs \$2 less", 30.0, 2.0, 4, "A pass to visit my family? That's actually sweet."),
+        Upgrade("reunion", Cat.SPOOKY, "Family reunion", "New relatives show up in the Death Realm faster", 80.0, 3.0, 2, "MORE family in the Death Realm? That means... oh no."),
+        Upgrade("snacks", Cat.SPOOKY, "Cloud snacks", "Visits to the Death Realm cheer {N} up for longer", 40.0, 2.0, 3, "Cloud snacks with Grandma! These are SO fluffy."),
+        Upgrade("nightlight", Cat.SPOOKY, "Night light", "Escaping the Nightmare Realm takes 5 seconds less holding", 50.0, 2.0, 4, "A night light! Dark Kevin hates night lights."),
+        Upgrade("loot", Cat.SPOOKY, "Nightmare loot", "Escaping the Nightmare Realm gives \$100 more", 70.0, 2.0, 5, "Treasure from the Nightmare Realm? I'm not touching it."),
+        Upgrade("brave", Cat.SPOOKY, "Brave heart", "{N} takes 10 seconds longer to turn evil when he is all gray", 40.0, 2.0, 4, "I'm brave now. ...I'm still a little scared of the dark."),
     )
 
     val pressDesc = listOf(

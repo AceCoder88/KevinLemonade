@@ -31,7 +31,7 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 enum class Face { HAPPY, CHEER, WORRY, GASP }
-enum class Screen { STAND, SHOP, CATCH }
+enum class Screen { STAND, SHOP, CATCH, TRAVEL, CLOSET, DATE, WAR, SPACE, DIG, PIRATE, RIDE, TOWER, LOTTO, RACE, TROPHY, REBIRTH, CODES, SETTINGS, THERAPY }
 
 /** Floating text on the stage. x/y are fractions of the stage box. */
 data class Pop(val id: Long, val text: String, val x: Float, val y: Float, val color: Color, val ms: Long = 1500)
@@ -98,6 +98,33 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     private var crankStart = 0L
     private var bag = ArrayList<Relative>()
     private var current = Lines.relatives[0]
+    private var toastJob: Job? = null
+
+    // ---------------- the rest of the game, one object per chunk ----------------
+    // (declared before init so load() can fill them)
+    val closet = ClosetState(this)
+    val dating = DatingState(this)
+    val travel = TravelState(this)
+    val war = WarState(this)
+    val space = SpaceState(this)
+    val dig = DigState(this)
+    val pirate = PirateState(this)
+    val ride = RideState(this)
+    val tower = TowerState(this)
+    val therapy = TherapyState(this)
+    val fun_ = FunState(this)
+    val features: List<Feature> = listOf(closet, dating, travel, war, space, dig, pirate, ride, tower, therapy, fun_)
+
+    /** a short message at the bottom of the screen (the original's toast()) */
+    var toastText by mutableStateOf<String?>(null)
+    fun toast(text: String) {
+        toastText = named(text)
+        toastJob?.cancel()
+        toastJob = viewModelScope.launch { delay(3200); toastText = null }
+    }
+
+    /** true while Kevin is in the Death Realm or the Nightmare Realm (the original's realm || nightmare) */
+    fun inRealm(): Boolean = false
 
     fun lv(id: String) = lvl[id] ?: 0
     fun llv(id: String) = lemonLvl[id] ?: 0
@@ -435,6 +462,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------------- shop ----------------
     fun upgradeVisible(u: Upgrade): Boolean {
+        if (u.cat == Cat.SPOOKY) return false
         if (u.id in Upgrades.needMotor && lv("motor") == 0) return false
         if (u.id == "arms" && lv("motor") > 0) return false
         return true
@@ -519,6 +547,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             }
             if (lv("puppy") > 0 && sad > 0) sad = max(0.0, sad - 0.08 * lv("puppy"))
             if (lv("nap") > 0 && ++napT >= 60) { napT = 0; sad = max(0.0, sad - 3 * lv("nap")) }
+            for (f in features) f.tick()
             if (sec % 5 == 0L) save()
         }
     }
@@ -548,6 +577,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         j.put("name", name); j.put("money", money); j.put("lemonsLeft", lemonsLeft); j.put("glasses", glasses)
         j.put("sad", sad); j.put("inPitcher", inPitcher)
         j.put("lvl", JSONObject(lvl.toMap())); j.put("lemonLvl", JSONObject(lemonLvl.toMap()))
+        for (f in features) j.put(f.key, JSONObject().also { f.save(it) })
         prefs.edit().putString("save", j.toString()).apply()
     }
 
@@ -560,6 +590,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             sad = j.optDouble("sad", 0.0); inPitcher = j.optInt("inPitcher", 0)
             j.optJSONObject("lvl")?.let { o -> o.keys().forEach { lvl[it] = o.getInt(it) } }
             j.optJSONObject("lemonLvl")?.let { o -> o.keys().forEach { lemonLvl[it] = o.getInt(it) } }
+            for (f in features) j.optJSONObject(f.key)?.let { o -> try { f.load(o) } catch (_: Exception) { } }
             juiceLevel = min(MAX_H, MAX_H * inPitcher / need())
         } catch (_: Exception) { }
     }
@@ -567,6 +598,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun restart() {
         name = "Kevin"; money = 0; lemonsLeft = 20; glasses = 0; sad = 0.0; inPitcher = 0
         lvl.clear(); lemonLvl.clear(); juiceLevel = 0f; partyUntil = 0
+        for (f in features) f.reset()
         showFace(Face.HAPPY)
         say("Hi! I'm Kevin. What are we making today?")
         screen = Screen.STAND
