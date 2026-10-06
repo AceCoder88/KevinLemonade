@@ -453,7 +453,7 @@ private fun DrawScope.drawDeathRealm(g: GameViewModel, timeMs: Long) {
         val bob = sin(timeMs / 500f + i) * 4f
         drawGhost(x, y + bob, r.famDone.getOrElse(i) { false })
     }
-    val n = min(r.famExtra, 28L).toInt()
+    val n = r.famExtra.coerceIn(0L, 28L).toInt()
     for (i in 0 until n) {
         val x = 300f + ((i * 137) % 470)
         val y = 40f + ((i * 89) % 200)

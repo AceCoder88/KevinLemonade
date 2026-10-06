@@ -24,11 +24,16 @@ import kotlin.math.roundToLong
  * gray for too long without a visit). Mirrors the original's `realm`/`nightmare`/`kevinGone`
  * globals and the functions around them.
  */
+/** after the 10 named relatives, MORE keep coming: about 12% more each time, up to 10 billion (the original's FAM_MAX) */
+const val FAM_MAX = 10_000_000_000L
+
 class RealmState(val g: GameViewModel) : Feature {
     override val key = "realm"
 
     /** in the Death Realm right now */
     var active by mutableStateOf(false)
+    /** tapped Visit mid-squeeze: the trip starts the moment the squeeze ends (the original's pendingVisit) */
+    var pendingVisit by mutableStateOf(false)
     /** in the Nightmare Realm right now (evil Kevin) */
     var nightmare by mutableStateOf(false)
     /** Kevin has been squeezed away entirely; the stand runs without him until you bring him back */
@@ -43,6 +48,7 @@ class RealmState(val g: GameViewModel) : Feature {
     /** how many of the 10 named relatives have shown up so far */
     var famCount by mutableLongStateOf(0L)
     /** every relative beyond the 10 named ones, as an uncounted crowd */
+    /** the crowd after the 10 named relatives; capped at FAM_MAX like the original */
     var famExtra by mutableLongStateOf(0L)
     val famDone = mutableStateListOf(false, false, false, false, false, false, false, false, false, false)
     var newGhostMsg by mutableStateOf<String?>(null)
@@ -64,7 +70,7 @@ class RealmState(val g: GameViewModel) : Feature {
     }
     override fun load(j: JSONObject) {
         kevinGone = j.optBoolean("kevinGone", false)
-        famCount = j.optLong("famCount", 0L); famExtra = j.optLong("famExtra", 0L)
+        famCount = j.optLong("famCount", 0L); famExtra = j.optLong("famExtra", 0L).coerceIn(0L, FAM_MAX)
         lemyMetFamily = j.optBoolean("lemyMetFamily", false)
         deadWearing = j.optString("deadWearing", "").ifEmpty { null }
         j.optJSONArray("famDone")?.let { a -> for (i in 0 until min(a.length(), famDone.size)) famDone[i] = a.optBoolean(i, false) }
@@ -87,14 +93,30 @@ class RealmState(val g: GameViewModel) : Feature {
 
     fun visitLabel(): String = when {
         active || nightmare -> ""
+        pendingVisit -> "Heading to the Death Realm..."
         kevinGone -> "Visit the Death Realm to bring Kevin back (\$$BRING_BACK)"
         else -> "Visit the Death Realm (\$${visitCost()})"
     }
-    fun canVisit(): Boolean = !g.busy && !active && !nightmare && !g.therapy.atTherapy &&
+    fun canVisit(): Boolean = !pendingVisit && !active && !nightmare && !g.therapy.atTherapy &&
         g.money >= (if (kevinGone) BRING_BACK else visitCost())
 
     fun visit() {
         if (!canVisit()) return
+        if (g.busy) {
+            // wait for the squeeze to finish (no new squeezes sneak in first: the auto-squeezers check pendingVisit)
+            pendingVisit = true
+            g.viewModelScope.launch {
+                while (g.busy) delay(50)
+                pendingVisit = false
+                startVisit()
+            }
+            return
+        }
+        startVisit()
+    }
+
+    private fun startVisit() {
+        if (active || nightmare || g.money < (if (kevinGone) BRING_BACK else visitCost())) return
         if (kevinGone) g.viewModelScope.launch { bringBack() } else g.viewModelScope.launch { goVisit() }
     }
 
@@ -225,7 +247,8 @@ class RealmState(val g: GameViewModel) : Feature {
             famCount++
             return
         }
-        val add = max(1L, ceil(famTotal() * 0.12).toLong())
+        val add = min(FAM_MAX - famExtra, max(1L, ceil(famTotal() * 0.12).toLong()))
+        if (add <= 0) return
         famExtra += add
         newGhostMsg = if (add == 1L) crowdName() else "${add} more relatives"
     }

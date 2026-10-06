@@ -16,9 +16,24 @@ android {
         versionName = "1.0"
     }
 
+    // One fixed key for every build (this machine and GitHub Actions), so a new APK installs as an update
+    // over the last one. It only identifies this hobby app; the repo is private.
+    signingConfigs {
+        create("kevin") {
+            storeFile = file("kevin.keystore")
+            storePassword = "kevinlemonade"
+            keyAlias = "kevin"
+            keyPassword = "kevinlemonade"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("kevin")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("kevin")
         }
     }
     compileOptions {

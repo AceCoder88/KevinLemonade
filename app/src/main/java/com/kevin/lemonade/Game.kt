@@ -683,11 +683,11 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             val now = SystemClock.uptimeMillis()
             if (inAnotherWorld()) { lastAuto += 100 }
             else {
-                if (lv("auto") > 0 && !busy && holdStart == 0L && !realm.active && !realm.nightmare &&
+                if (lv("auto") > 0 && !busy && holdStart == 0L && !realm.active && !realm.nightmare && !realm.pendingVisit &&
                     (lemonsLeft > 0 || pirate.limesLeft > 0) && now - lastAuto >= autoEvery()
                 ) { lastAuto = now; squeeze(false) }
                 // the Extra squeezer upgrade: 1-3 little squeezers that work all by themselves
-                if (lv("squeezers") > 0 && !realm.active && !realm.nightmare) {
+                if (lv("squeezers") > 0 && !realm.active && !realm.nightmare && !realm.pendingVisit) {
                     for (i in 0 until lv("squeezers")) {
                         squeezerT[i] += 0.1
                         if (squeezerT[i] < 5.5 / speed()) continue

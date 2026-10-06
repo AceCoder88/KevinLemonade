@@ -21,11 +21,11 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK
+      - name: Build release APK
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --console=plain
-          cp app/build/outputs/apk/debug/app-debug.apk KevinLemonade.apk
+          ./gradlew assembleRelease --console=plain
+          cp app/build/outputs/apk/release/app-release.apk KevinLemonade.apk
 
       - uses: actions/upload-artifact@v4
         with:
@@ -41,5 +41,5 @@ jobs:
           gh release delete latest --yes --cleanup-tag || true
           gh release create latest KevinLemonade.apk \
             --title "Latest build" \
-            --notes "Debug build of ${GITHUB_SHA::7}." \
+            --notes "Build of ${GITHUB_SHA::7}." \
             --target "$GITHUB_SHA"
