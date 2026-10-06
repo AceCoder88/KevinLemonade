@@ -113,7 +113,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     val tower = TowerState(this)
     val therapy = TherapyState(this)
     val fun_ = FunState(this)
-    val features: List<Feature> = listOf(closet, dating, travel, war, space, dig, pirate, ride, tower, therapy, fun_)
+    val realm = RealmState(this)
+    val features: List<Feature> = listOf(closet, dating, travel, war, space, dig, pirate, ride, tower, therapy, fun_, realm)
 
     /** a short message at the bottom of the screen (the original's toast()) */
     var toastText by mutableStateOf<String?>(null)
@@ -124,7 +125,15 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** true while Kevin is in the Death Realm or the Nightmare Realm (the original's realm || nightmare) */
-    fun inRealm(): Boolean = false
+    fun inRealm(): Boolean = realm.active || realm.nightmare
+
+    /** limes: a lemon stand-in that cheers Kevin up instead of making him sad (from Be a Pirate) */
+    var limesLeft by mutableIntStateOf(0)
+    /** true while a finger is down on Kevin (so checkGray doesn't turn him evil mid-tap) */
+    var holdingKevin by mutableStateOf(false)
+    /** which variant of War/Dig is open: "normal", or themed from a Death Realm / Nightmare Realm extra */
+    var warTheme by mutableStateOf("normal")
+    var mineTheme by mutableStateOf("normal")
 
     // ---------------- shared state the original kept at the top of its script ----------------
     // Several features set these (surprise events, codes, the admin panel, the traveling shop, the
@@ -172,22 +181,39 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------------- the original game's formulas ----------------
     fun lemonCap() = 20 + 20 * llv("cap")
-    fun price(): Long = ((2 + lv("sugar") + lv("zest") + 5 * lv("truck") + 10 * lv("register")) *
+    fun price(): Long = ((2 + lv("sugar") + lv("zest") + 5 * lv("truck") + 10 * lv("register") +
+            (if (closet.wearing("tie")) 3 else 0) + (if (closet.wearing("pirateboots")) 2 else 0)) *
             2.0.pow(lv("ice")) * (1 + 0.25 * lv("sign")) * (1 + 0.5 * lv("franchise")) * (1 + 0.1 * lv("awning")) *
+            (if (closet.wearing("tophat")) 1.25 else 1.0) * (if (closet.wearing("tuxedo")) 1.2 else 1.0) *
+            (if (closet.wearing("piratecoat")) 1.1 else 1.0) * (if (closet.wearingSet("fancy")) 1.5 else 1.0) *
+            (if (closet.wearingSet("summer")) 1.75 else 1.0) *
             (1 + 0.15 * lv("bigcups")) * (1 + 0.2 * lv("neon"))).roundToLong()
-    fun need() = max(1, 5 - lv("juicy"))
-    fun speed() = 1.3.pow(lv("fast")) * 1.15.pow(lv("turbo"))
+    fun need() = max(1, 5 - lv("juicy") - (if (closet.wearing("chef")) 1 else 0) - (if (closet.wearingSet("baker")) 1 else 0))
+    fun speed() = 1.3.pow(lv("fast")) * 1.15.pow(lv("turbo")) * (if (closet.wearing("sneakers")) 1.2 else 1.0) *
+            (if (now() < speedUntil) speedMult else 1.0)
     private fun sd(ms: Double) = ms / speed()
-    fun autoEvery(): Double = listOf(0, 4000, 3000, 2000, 1400, 900, 650, 450)[lv("auto")] / (1 + 0.25 * lv("hydraulic"))
-    fun doom() = (30.0 + 12 * lv("therapy")) * (1 + 0.1 * lv("chair")) * (1 + 0.15 * lv("games"))
+    fun autoEvery(): Double = listOf(0, 4000, 3000, 2000, 1400, 900, 650, 450)[lv("auto")] /
+            (if (closet.wearing("skates")) 2.0 else 1.0) / (if (closet.wearingSet("cowboy")) 1.3 else 1.0) /
+            (1 + 0.25 * lv("hydraulic"))
+    fun doom() = (30.0 + 12 * lv("therapy") + 6 * (1 + lv("snacks")) * min(visits, 5)) *
+            (if (closet.wearing("shades")) 2.0 else 1.0) * (1 + 0.1 * lv("chair")) *
+            (if (closet.wearing("sweater")) 1.3 else 1.0) * (if (closet.wearingSet("winter")) 3.0 else 1.0) *
+            (1 + 0.15 * lv("games"))
     fun sadFrac() = min(1.0, sad / doom())
     fun stage() = if (sad / doom() < 0.34) 0 else if (sad / doom() < 0.67) 1 else 2
     fun partyOn() = SystemClock.uptimeMillis() < partyUntil
-    fun earn(): Long {
+    /** the price a pitcher sells for right now, before Kevin's mood, rebirth, Lemy, party or rainbow bonuses */
+    fun earnBase(): Long {
+        if (now() < megaUntil) return price() * 10
+        if (now() < frenzyUntil) return price() * 3
+        if (realm.kevinGone) return price()
         val full = price()
-        val base = when (stage()) { 0 -> full; 1 -> max(1L, Math.round(full / 2.0)); else -> 1L }
-        return base * (if (partyOn()) 3 else 1)
+        return when (stage()) { 0 -> full; 1 -> max(1L, Math.round(full / 2.0)); else -> 1L }
     }
+    fun earn(): Long = Math.round(
+        fun_.rebirthMult() * earnBase() * (if (dating.momoWith) 2 else 1) *
+            (if (partyOn()) 3 else 1) * (if (now() < rainbowUntil) 2 else 1)
+    )
     fun named(s: String) = s.replace("{N}", name)
 
     init {
@@ -255,12 +281,12 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         return v[i] + (v[i + 1] - v[i]) * u
     }
 
-    private fun jump() {
+    internal fun jump() {
         if (stage() >= 1) return
         viewModelScope.launch { tween(450.0) { kevinDy = -22f * sin(PI.toFloat() * easeOut(it)) } ; kevinDy = 0f }
         viewModelScope.launch { tween(600.0) { armRot = kf(it, 0f, -30f, 10f, 0f) } }
     }
-    private fun shiver() {
+    internal fun shiver() {
         viewModelScope.launch { repeat(3) { tween(180.0) { kevinDx = kf(it, 0f, -4f, 4f, 0f) } }; kevinDx = 0f }
     }
     private fun dance() {
@@ -290,38 +316,55 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     // ---------------- squeezing ----------------
     fun mainButton() {
         if (cranking) { crankTap(); return }
+        if (realm.nightmare) { realm.noEscape(); return }
+        if (realm.active) { realm.leaveRealm(); return }
         squeeze(true)
     }
 
     fun squeeze(byHand: Boolean) {
         if (busy) return
-        if (lemonsLeft <= 0) {
+        if (realm.nightmare) { realm.noEscape(); return }
+        if (realm.active) { realm.leaveRealm(); return }
+        val isLime = limesLeft > 0
+        if (!isLime && lemonsLeft <= 0) {
             say(Lines.outOfLemons.pick())
             catchNudge++
             return
         }
         busy = true
         viewModelScope.launch {
-            try { squeezeFlow(byHand) } finally { busy = false; cranking = false }
+            try { squeezeFlow(byHand, isLime) } finally { busy = false; cranking = false }
         }
     }
 
-    private suspend fun squeezeFlow(byHand: Boolean) {
-        if (lv("lucky") > 0 && Random.nextDouble() < 0.1 * lv("lucky")) popAt("Lucky! Free lemon", 0.30f, 0.20f)
+    private suspend fun squeezeFlow(byHand: Boolean, isLime: Boolean) {
+        if (isLime) limesLeft--
+        else if (lv("lucky") > 0 && Random.nextDouble() < 0.1 * lv("lucky")) popAt("Lucky! Free lemon", 0.30f, 0.20f)
         else lemonsLeft--
-        // the Mega hopper squeezes extra lemons at the same time
-        var extra = 0
-        repeat(lv("multisq")) { if (lemonsLeft > 0) { lemonsLeft--; extra++ } }
+        // the Mega hopper squeezes extra lemons (or limes) at the same time
+        var extra = 0; var extraLimes = 0
+        repeat(lv("multisq")) {
+            if (limesLeft > 0) { limesLeft--; extra++; extraLimes++ }
+            else if (lemonsLeft > 0) { lemonsLeft--; extra++ }
+        }
         if (extra > 0) popAt("${extra + 1} lemons at once!", 0.52f, 0.20f)
+        // after a rebirth, a second full-size squeezer squeezes another lemon (or lime) at the same time
+        var twinLime = false; var twin = false
+        if (fun_.rebirths >= 1) {
+            if (limesLeft > 0) { limesLeft--; twin = true; twinLime = true }
+            else if (lemonsLeft > 0) { lemonsLeft--; twin = true }
+            if (twin) popAt("Extra squeeze!", 0.46f, 0.22f)
+        }
 
         look = Offset(420f, 60f)
         nextRelative()
         val golden = (lv("golden") > 0 && Random.nextDouble() < 0.05 * lv("golden")) ||
                 (lv("goldluck") > 0 && Random.nextDouble() < 0.03 * lv("goldluck"))
-        val diamond = !golden && lv("diamondluck") > 0 && Random.nextDouble() < 0.015 * lv("diamondluck")
-        dropColor = if (golden) Color(0xFFFFC400) else if (diamond) Color(0xFFA8EEFF) else PEEL
+        val diamond = !golden && !isLime && lv("diamondluck") > 0 && Random.nextDouble() < 0.015 * lv("diamondluck")
+        dropColor = if (golden) Color(0xFFFFC400) else if (diamond) Color(0xFFA8EEFF) else if (isLime) Color(0xFF7BC043) else PEEL
         dropGlow = if (golden) Color(0xFFFFE066) else if (diamond) Color(0xFFDFF8FF) else null
-        showFace(Face.WORRY); say(story("drop")); shiver()
+        if (isLime) { showFace(Face.CHEER); say(Lines.LimeLines.drop.pick()) }
+        else { showFace(Face.WORRY); say(story("drop")); shiver() }
 
         // the lemon falls in and bounces
         dropSx = 1f; dropSy = 1f; dropVisible = true
@@ -336,8 +379,9 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         look = Offset(420f, 218f)
         delay(sd(250.0).toLong())
 
-        showFace(Face.GASP)
+        showFace(if (isLime) Face.CHEER else Face.GASP)
         say(when {
+            isLime -> Lines.LimeLines.squish.pick()
             golden -> "Whoa, ${current.n} is GOLDEN?!"
             diamond -> "${current.n} is made of DIAMOND?! Since WHEN?!"
             else -> story("squish")
@@ -361,8 +405,17 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         if (lv("doubleplunge") > 0 && Random.nextDouble() < 0.12 * lv("doubleplunge")) {
             inPitcher += per; popAt("Double squeeze!", 0.48f, 0.25f)
         }
-        sad = min(doom(), sad + 1 + extra)
-        inPitcher += per * (1 + extra)
+        if (isLime) sad = max(0.0, sad - 1.0) else if (now() >= happyUntil) sad = min(doom(), sad + 1.0)
+        inPitcher += per
+        if (extra > 0) {
+            inPitcher += per * extra
+            sad = max(0.0, sad - extraLimes)
+            if (now() >= happyUntil) sad = min(doom(), sad + (extra - extraLimes))
+        }
+        if (twin) {
+            inPitcher += per
+            if (twinLime) sad = max(0.0, sad - 1.0) else if (now() >= happyUntil) sad = min(doom(), sad + 1.0)
+        }
         if (diamond) { val b = price() * 30; money += b; popAt("+${fmt(b)} DIAMOND!", 0.55f, 0.30f, Color(0xFF2E9BD6), 1800) }
         if (golden) { val b = price() * 10; money += b; popAt("+${fmt(b)} GOLDEN!", 0.55f, 0.30f, Color(0xFFE9A800)) }
         setLevel(min(MAX_H, MAX_H * inPitcher / need()), sd(700.0))
@@ -382,7 +435,19 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             delay(sd(300.0).toLong())
         }
         showFace(Face.HAPPY)
-        if (!sold) say(if (golden) "We're RICH! ...I still feel weird about it." else story("after"))
+        if (!sold) say(if (isLime) Lines.LimeLines.after.pick() else if (golden) "We're RICH! ...I still feel weird about it." else story("after"))
+        else realm.newGhostMsg?.let { say("Wait... I think $it just showed up in the Death Realm."); realm.newGhostMsg = null }
+    }
+
+    /** juice from anywhere other than the main squeezer (the extra squeezers upgrade); sells a full pitcher */
+    private fun addJuice(n: Int) {
+        inPitcher += n
+        juiceLevel = min(MAX_H, MAX_H * inPitcher / need())
+        if (inPitcher >= need() && !busy) {
+            inPitcher = 0
+            sellPitcher()
+            viewModelScope.launch { delay(300); if (!busy && inPitcher == 0) setLevel(0f, 400.0) }
+        }
     }
 
     private fun juiceSplash(c: Color) {
@@ -433,14 +498,15 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         }
         popAt("+" + fmt(p))
         moneyBump++
+        realm.maybeSpawnGhost()
         save()
     }
 
     // ---------------- poking & holding Kevin ----------------
     private fun therapyTap(): Boolean {
-        if (sad <= 0) return false
+        if (realm.nightmare || realm.active || realm.kevinGone || sad <= 0) return false
         taps++
-        sad = max(0.0, sad - TAP_HEAL)
+        sad = max(0.0, sad - TAP_HEAL * (if (closet.wearing("clownnose")) 2 else 1))
         heart()
         if (!busy && taps % 6 == 1) say(if (sad <= 0) "I feel GREAT! Thanks, buddy." else Lines.therapyTap.pick())
         if (!busy) showFace(Face.HAPPY)
@@ -452,7 +518,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         val now = SystemClock.uptimeMillis()
         pokeTimes.removeAll { now - it >= 2500 }
         pokeTimes.add(now)
-        if (pokeTimes.size >= 6 && !busy) {
+        if (pokeTimes.size >= 6 && !busy && !realm.active && !realm.nightmare) {
             pokeTimes.clear()
             dance()
             sad = max(0.0, sad - 3)
@@ -462,16 +528,32 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (therapyTap()) return
         if (busy) return
+        if (realm.nightmare) return
+        if (realm.active) {
+            showFace(Face.CHEER); say(Lines.realmPoke.pick()); jump()
+            viewModelScope.launch { delay(700); showFace(Face.HAPPY) }
+            return
+        }
         showFace(Face.CHEER)
         say(Lines.poke[stage()].pick())
         jump()
         viewModelScope.launch { delay(700); if (!busy) showFace(Face.HAPPY) }
     }
 
+    /** the clown outfit set earns Kevin a tip every time you tap or hold him */
+    private fun clownTip() {
+        if (!closet.wearingSet("clown")) return
+        val tip = max(2L, Math.round(price() / 2.0))
+        money += tip
+        popAt("Honk! +${fmt(tip)}", 0.22f, 0.30f)
+    }
+
     fun kevinDown() {
-        if (busy) { therapyTap(); return }
-        if (holdStart != 0L) return
+        clownTip()
+        if (busy && !realm.nightmare && !realm.active) { therapyTap(); return }
+        if (busy || realm.nightmare || holdStart != 0L) return
         holdStart = SystemClock.uptimeMillis()
+        holdingKevin = true
         holdJob = viewModelScope.launch {
             var lastLine = -1
             while (true) {
@@ -485,6 +567,11 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
                         showFace(if (idx < 2) Face.WORRY else Face.GASP)
                         say(Lines.hold[idx]); shiver()
                     }
+                    if (t >= 1f) {
+                        holdStart = 0L; holdingKevin = false; holdJob = null; holdProgress = 0f
+                        realm.squeezeFriend()
+                        return@launch
+                    }
                 }
                 delay(16)
             }
@@ -495,6 +582,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         if (holdStart == 0L) return
         val held = SystemClock.uptimeMillis() - holdStart
         holdStart = 0L
+        holdingKevin = false
         holdJob?.cancel(); holdJob = null
         holdProgress = 0f
         if (held <= TAP_MS) poke()
@@ -503,7 +591,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------------- shop ----------------
     fun upgradeVisible(u: Upgrade): Boolean {
-        if (u.cat == Cat.SPOOKY) return false
+        // spooky upgrades are only for sale while visiting the Death Realm
+        if (u.cat == Cat.SPOOKY) return realm.active
         if (u.id in Upgrades.needMotor && lv("motor") == 0) return false
         if (u.id == "arms" && lv("motor") > 0) return false
         return true
@@ -519,6 +608,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         lvl[u.id] = lv(u.id) + 1
         say(u.say)
         if (u.id == "therapy") showFace(Face.HAPPY)
+        if (u.id == "girlfriend" && !realm.kevinGone && !realm.nightmare) dating.momoWith = true
         zestSays = Lines.zestBuy.pick()
         save()
     }
@@ -541,7 +631,31 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun openShop() { zestSays = Lines.zestHello.pick(); screen = Screen.SHOP }
     fun pokeZest() { zestSays = Lines.zestPoke.pick() }
 
+    // ---------------- the puppy, and clouds that rain lemons ----------------
+    private var puppyPetCd = 0L
+    fun petPuppy() {
+        if (now() < puppyPetCd) return
+        puppyPetCd = now() + 2500
+        sad = max(0.0, sad - 0.5)
+        popAt("Woof! Woof!", 0.54f, 0.68f)
+        if (talk["poke"] == true && !busy) say(listOf(
+            "Who's a good boy? ZESTY is!", "Zesty! Did you just lick the squeezer? Gross. Good boy.",
+            "Zesty, sit! ...Zesty, stand! He does whatever he wants.", "My puppy is the best puppy in the whole galaxy.",
+        ).pick())
+    }
+
+    private val cloudCooldown = LongArray(3)
+    fun rainCloud(index: Int) {
+        if (realm.active || realm.nightmare || index !in cloudCooldown.indices || now() < cloudCooldown[index]) return
+        cloudCooldown[index] = now() + 20000
+        if (lemonsLeft < lemonCap()) { lemonsLeft++; popAt("The cloud rained a lemon! +1", 0.5f, 0.18f) }
+        else popAt("Pitter patter! (lemon storage is full)", 0.5f, 0.18f)
+    }
+
     // ---------------- things that happen over time ----------------
+    /** screens where the original paused the auto-squeezer and the gray-out countdown */
+    private fun inAnotherWorld() = screen in setOf(Screen.CATCH, Screen.WAR, Screen.SPACE, Screen.PIRATE, Screen.DIG, Screen.RIDE)
+
     private suspend fun ticker() {
         var lastAuto = SystemClock.uptimeMillis()
         var farmAcc = 0L
@@ -549,13 +663,28 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         var sec = 0L
         var factoryT = 0; var bankT = 0; var fanT = 0; var rainT = 0; var hugT = 0; var partyT = 0
         var deliveryT = 0; var napT = 0; var billT = 0
+        val squeezerT = DoubleArray(3)
         while (true) {
             delay(100)
             val now = SystemClock.uptimeMillis()
-            // auto-squeezer (paused while you're catching lemons, like the original)
-            if (screen == Screen.CATCH) lastAuto += 100
-            else if (lv("auto") > 0 && !busy && holdStart == 0L && lemonsLeft > 0 && now - lastAuto >= autoEvery()) {
-                lastAuto = now; squeeze(false)
+            if (inAnotherWorld()) { lastAuto += 100 }
+            else {
+                if (lv("auto") > 0 && !busy && holdStart == 0L && !realm.active && !realm.nightmare &&
+                    (lemonsLeft > 0 || limesLeft > 0) && now - lastAuto >= autoEvery()
+                ) { lastAuto = now; squeeze(false) }
+                // the Extra squeezer upgrade: 1-3 little squeezers that work all by themselves
+                if (lv("squeezers") > 0 && !realm.active && !realm.nightmare) {
+                    for (i in 0 until lv("squeezers")) {
+                        squeezerT[i] += 0.1
+                        if (squeezerT[i] < 5.5 / speed()) continue
+                        if (limesLeft <= 0 && lemonsLeft <= 0) continue
+                        squeezerT[i] = 0.0
+                        val miniLime = limesLeft > 0
+                        if (miniLime) limesLeft-- else lemonsLeft--
+                        if (miniLime) sad = max(0.0, sad - 0.5) else sad = min(doom(), sad + 0.5)
+                        addJuice(1 + lv("press"))
+                    }
+                }
             }
             // lemon farm
             if (lv("farm") > 0) {
@@ -565,6 +694,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
                     if (lemonsLeft < lemonCap()) lemonsLeft++
                 }
             }
+            if (!inAnotherWorld()) realm.checkGray(now)
             secAcc += 100
             if (secAcc < 1000) continue
             secAcc = 0; sec++
@@ -617,6 +747,9 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         val j = JSONObject()
         j.put("name", name); j.put("money", money); j.put("lemonsLeft", lemonsLeft); j.put("glasses", glasses)
         j.put("sad", sad); j.put("inPitcher", inPitcher)
+        j.put("visits", visits); j.put("limesLeft", limesLeft); j.put("gender", gender)
+        j.put("cute", cute); j.put("og", og)
+        j.put("talk", JSONObject(talk.toMap()))
         j.put("lvl", JSONObject(lvl.toMap())); j.put("lemonLvl", JSONObject(lemonLvl.toMap()))
         for (f in features) j.put(f.key, JSONObject().also { f.save(it) })
         prefs.edit().putString("save", j.toString()).apply()
@@ -629,6 +762,9 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             name = j.optString("name", "Kevin")
             money = j.optLong("money", 0); lemonsLeft = j.optInt("lemonsLeft", 20); glasses = j.optInt("glasses", 0)
             sad = j.optDouble("sad", 0.0); inPitcher = j.optInt("inPitcher", 0)
+            visits = j.optInt("visits", 0); limesLeft = j.optInt("limesLeft", 0); gender = j.optString("gender", "boy")
+            cute = j.optBoolean("cute", false); og = j.optBoolean("og", false)
+            j.optJSONObject("talk")?.let { o -> o.keys().forEach { talk[it] = o.optBoolean(it, true) } }
             j.optJSONObject("lvl")?.let { o -> o.keys().forEach { lvl[it] = o.getInt(it) } }
             j.optJSONObject("lemonLvl")?.let { o -> o.keys().forEach { lemonLvl[it] = o.getInt(it) } }
             for (f in features) j.optJSONObject(f.key)?.let { o -> try { f.load(o) } catch (_: Exception) { } }
@@ -638,6 +774,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     fun restart() {
         name = "Kevin"; money = 0; lemonsLeft = 20; glasses = 0; sad = 0.0; inPitcher = 0
+        visits = 0; limesLeft = 0; warTheme = "normal"; mineTheme = "normal"; bypassLocks = false
         lvl.clear(); lemonLvl.clear(); juiceLevel = 0f; partyUntil = 0
         for (f in features) f.reset()
         showFace(Face.HAPPY)
