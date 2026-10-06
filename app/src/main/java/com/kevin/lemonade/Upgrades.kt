@@ -26,7 +26,14 @@ data class Upgrade(
     val max: Int,
     val say: String,
 ) {
-    fun cost(level: Int): Long = (base * grow.pow(level)).roundToLong()
+    /**
+     * [discount] is Mr. Zest's mustache discount (the original's
+     * `wearingSet('mustache') ? 0.7 : wearing('mustache') ? 0.9 : 1`), passed in by the
+     * shop via [ClosetState.mustacheDiscount]. Defaults to 1.0 so existing call sites
+     * (Game.kt's buy()) keep compiling; see Shop.kt's report for what buy() must do
+     * to actually charge this same discounted price.
+     */
+    fun cost(level: Int, discount: Double = 1.0): Long = (base * grow.pow(level) * discount).roundToLong()
 }
 
 object Upgrades {
