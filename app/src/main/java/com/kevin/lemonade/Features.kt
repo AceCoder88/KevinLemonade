@@ -23,8 +23,8 @@ interface Feature {
     fun load(j: JSONObject)
     /** back to a brand new game */
     fun reset()
-    /** what Rebirth does to this feature; the original's rebirth wipes most things */
-    fun onRebirth() = reset()
+    /** what Rebirth does to this feature. The original keeps everything except money and Mr. Zest's regular/advanced upgrades, so by default nothing happens */
+    fun onRebirth() {}
     /** the MAX OUT secret code: set every upgrade in this feature to its max */
     fun maxOut() {}
     /** once a second, on the main thread, wherever the player is */

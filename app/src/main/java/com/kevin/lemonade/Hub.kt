@@ -47,7 +47,7 @@ fun Hub(g: GameViewModel) {
         HubTab.FUN -> listOf(
             Place("🎟️ Lemon Lottery", Color(0xFF4FA34A), show = g.lv("lottopass") > 0) { g.screen = Screen.LOTTO },
             Place("🏁 Lemon Races", RED, show = g.lv("racepass") > 0) { g.screen = Screen.RACE },
-            Place("🏆 Trophies", Color(0xFFE9B630), LINE, show = true) { g.screen = Screen.TROPHY },
+            Place("🏆 " + g.fun_.trophyLabel(),Color(0xFFE9B630), LINE, show = true) { g.screen = Screen.TROPHY },
             Place("✨ Rebirth", Color(0xFF7B5CFF), show = true) { g.screen = Screen.REBIRTH },
         )
         HubTab.KEVIN -> listOf(
